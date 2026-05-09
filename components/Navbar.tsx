@@ -16,8 +16,9 @@ export function Navbar() {
             alt="CipherSwap Logo"
             width={22}
             height={22}
-            quality={100}
             unoptimized
+            priority
+            style={{ width: 22, height: 22 }}
             className="group-hover:scale-105 transition-transform"
           />
           <span className="text-sm font-bold font-mono tracking-wide">

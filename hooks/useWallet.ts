@@ -6,7 +6,13 @@ import { mainnet, base, arbitrum, polygon, optimism, avalanche, bsc } from 'viem
 
 type WalletType = 'evm' | 'solana' | 'bitcoin' | 'tron' | null;
 
-const SOLANA_RPC = '/api/rpc/solana';
+// Solana web3.js's Connection() validates the URL, so we must hand it an
+// absolute URL. fetch() accepts relative URLs fine; using the same helper
+// for both keeps the path in one place.
+function getSolanaRpcUrl(): string {
+  if (typeof window === 'undefined') return 'https://api.mainnet-beta.solana.com';
+  return `${window.location.origin}/api/rpc/solana`;
+}
 
 export interface DetectedWallet {
   type: WalletType;
@@ -407,7 +413,7 @@ export function useWallet(): UseWalletReturn {
 
     if (state.walletType === 'solana') {
       const { PublicKey, Transaction, Connection } = await import('@solana/web3.js');
-      const connection = new Connection(SOLANA_RPC);
+      const connection = new Connection(getSolanaRpcUrl());
       const tx = new Transaction();
 
       if (contractAddress) {
@@ -508,7 +514,7 @@ export function useWallet(): UseWalletReturn {
         return bal;
       }
       if (state.walletType === 'solana') {
-        const rpcRes = await fetch(SOLANA_RPC, {
+        const rpcRes = await fetch(getSolanaRpcUrl(), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -549,7 +555,7 @@ export function useWallet(): UseWalletReturn {
         return bal;
       }
       if (state.walletType === 'solana') {
-        const rpcRes = await fetch(SOLANA_RPC, {
+        const rpcRes = await fetch(getSolanaRpcUrl(), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'getBalance', params: [state.address] }),

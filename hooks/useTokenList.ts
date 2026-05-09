@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import type { SourceToken, PopularPair } from '@/app/_components/types';
-import { CIPHERSCAN_API, FALLBACK_TOKENS, apiTokensToSourceTokens, sortTokens } from '@/app/_components/types';
+import { FALLBACK_TOKENS, apiTokensToSourceTokens, sortTokens } from '@/app/_components/types';
 
 export function useTokenList(initialTokens?: SourceToken[]) {
   const [tokens, setTokens] = useState<SourceToken[]>(initialTokens ?? FALLBACK_TOKENS);
@@ -18,7 +18,7 @@ export function useTokenList(initialTokens?: SourceToken[]) {
       try {
         const [tokensRes, pairsRes] = await Promise.all([
           fetch('/api/swap/tokens'),
-          fetch(`${CIPHERSCAN_API}/api/crosschain/popular-pairs`).catch(() => null),
+          fetch('/api/cipherscan/api/crosschain/popular-pairs').catch(() => null),
         ]);
         const tokensData = await tokensRes.json();
         const pairsData = pairsRes ? await pairsRes.json().catch(() => null) : null;

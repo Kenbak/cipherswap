@@ -12,7 +12,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'Swap API not configured' }, { status: 503 });
     }
 
-    const { originAsset, destinationAsset, amount, recipient, refundTo, slippageBps } = await req.json();
+    const { originAsset, destinationAsset, amount, recipient, refundTo, slippageBps, dry } = await req.json();
 
     if (!originAsset || !destinationAsset || !amount || !recipient || !refundTo) {
       return NextResponse.json({
@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
     const deadline = new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString();
 
     const quoteBody = {
-      dry: false,
+      dry: dry === true,
       swapType: 'EXACT_INPUT',
       slippageTolerance: slippageBps || 100,
       originAsset,
