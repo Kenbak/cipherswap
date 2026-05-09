@@ -106,19 +106,16 @@
 }
 
 @layer base {
+  html {
+    background-color: var(--color-bg);
+  }
+
   body {
     @apply font-sans transition-colors duration-normal;
     background-color: var(--color-bg);
     color: var(--color-text-primary);
-    background-image:
-      radial-gradient(circle at 20% 50%, rgba(0, 212, 255, 0.04) 0%, transparent 50%),
-      radial-gradient(circle at 80% 80%, rgba(167, 139, 250, 0.04) 0%, transparent 50%);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-  }
-
-  .light body {
-    background-image: none;
   }
 
   code {

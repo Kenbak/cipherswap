@@ -6,7 +6,7 @@ import { mainnet, base, arbitrum, polygon, optimism, avalanche, bsc } from 'viem
 
 type WalletType = 'evm' | 'solana' | 'bitcoin' | 'tron' | null;
 
-const SOLANA_RPC = `https://mainnet.helius-rpc.com/?api-key=${process.env.NEXT_PUBLIC_HELIUS_API_KEY || ''}`;
+const SOLANA_RPC = '/api/rpc/solana';
 
 export interface DetectedWallet {
   type: WalletType;
@@ -23,7 +23,7 @@ interface WalletState {
   chainId: number | null;
 }
 
-interface UseWalletReturn extends WalletState {
+export interface UseWalletReturn extends WalletState {
   connect: (wallet: DetectedWallet) => Promise<void>;
   disconnect: () => void;
   sendTransaction: (to: string, amount: string, decimals: number, contractAddress?: string) => Promise<string>;
@@ -146,10 +146,14 @@ function requestStandardWallets() {
   };
 
   window.addEventListener('wallet-standard:register-wallet', ((e: CustomEvent) => {
-    if (typeof e.detail === 'function') e.detail(register);
+    try {
+      if (typeof e.detail === 'function') e.detail(register);
+    } catch { /* extension-side error — safe to ignore */ }
   }) as EventListener);
 
-  window.dispatchEvent(new CustomEvent('wallet-standard:app-ready', { detail: register }));
+  try {
+    window.dispatchEvent(new CustomEvent('wallet-standard:app-ready', { detail: register }));
+  } catch { /* extension-side error — safe to ignore */ }
 }
 
 const LOCAL_WALLET_ICONS: Record<string, string> = {
