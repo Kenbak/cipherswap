@@ -1,11 +1,12 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { TokenChainIcon } from '@/components/TokenChainIcon';
 import { TokenPicker } from '../TokenPicker';
 import { Stepper } from '../Stepper';
 import { useZecPrice } from '../ZecPriceContext';
-import type { SourceToken, CommonAmountsResponse, Mode } from '../types';
-import { validateZecAddress, formatRecAmount, getBlendingLabel } from '../types';
+import type { SourceToken, Mode } from '../types';
+import { validateZecAddress } from '../types';
 
 interface FormProps {
   mode: Mode;
@@ -16,9 +17,10 @@ interface FormProps {
   selectedToken: SourceToken;
   tokens: SourceToken[];
   tokensLoading: boolean;
-  recommendations: CommonAmountsResponse | null;
   balance: string | null;
+  balanceLoading?: boolean;
   previewZec: string;
+  previewLoading?: boolean;
   loading: boolean;
   error: string;
   walletAddress?: string | null;
@@ -32,6 +34,27 @@ interface FormProps {
   onGoConnect: () => void;
   showSlippage: boolean;
   onToggleSlippage: () => void;
+  showBuyWithCard?: boolean;
+  onBuyWithCard?: () => void;
+  buyWithCardLoading?: boolean;
+  buyWithCardError?: string | null;
+}
+
+/** Step advances to "receive" only after the user engages the ZEC field — not when amount is typed. */
+function getFormStepIndex(
+  amount: string,
+  zecAddress: string,
+  effectiveRefund: string,
+  addressEngaged: boolean,
+): number {
+  const hasValidAmount = !!(amount && parseFloat(amount) > 0);
+  const zecErr = validateZecAddress(zecAddress);
+  const hasValidZec = !!(zecAddress && !zecErr);
+
+  if (!hasValidAmount) return 0;
+  if (hasValidZec && effectiveRefund) return 2;
+  if (addressEngaged || zecAddress.length > 0) return 1;
+  return 0;
 }
 
 function ctaLabel(state: {
@@ -50,11 +73,101 @@ function ctaLabel(state: {
   return 'Get Quote';
 }
 
+function SwapOptionsBar({
+  mode,
+  walletAddress,
+  refundAddress,
+  selectedToken,
+  slippageBps,
+  showSlippage,
+  onToggleSlippage,
+  onSetRefundAddr,
+  onSetSlippage,
+}: {
+  mode: Mode;
+  walletAddress?: string | null;
+  refundAddress: string;
+  selectedToken: SourceToken;
+  slippageBps: number;
+  showSlippage: boolean;
+  onToggleSlippage: () => void;
+  onSetRefundAddr: (v: string) => void;
+  onSetSlippage: (v: number) => void;
+}) {
+  const shortRefund =
+    walletAddress
+      ? `${walletAddress.slice(0, 6)}…${walletAddress.slice(-4)}`
+      : refundAddress
+        ? `${refundAddress.slice(0, 6)}…${refundAddress.slice(-4)}`
+        : null;
+
+  return (
+    <div className="surface-inset rounded-lg overflow-hidden text-xs font-sans">
+      {mode === 'manual' && (
+        <div className="px-3 py-2.5 border-b border-[var(--color-border-subtle)]">
+          <label className="text-[10px] font-mono text-muted uppercase tracking-wider mb-1 block">
+            Refund address ({selectedToken.chainLabel})
+          </label>
+          <input
+            type="text"
+            value={refundAddress}
+            onChange={(e) => onSetRefundAddr(e.target.value)}
+            placeholder="Address you're sending from"
+            className="input-shell w-full px-3 py-2 text-primary font-mono text-sm placeholder:text-muted/40 focus:outline-none"
+          />
+        </div>
+      )}
+
+      <div className="px-3 py-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-muted">
+        {mode === 'wallet' && shortRefund && (
+          <>
+            <span className="text-secondary">
+              Refund <span className="font-mono text-primary">{shortRefund}</span>
+            </span>
+            <span aria-hidden>·</span>
+          </>
+        )}
+        <span>
+          Slippage <span className="font-mono text-secondary">{slippageBps / 100}%</span>
+        </span>
+        <span aria-hidden>·</span>
+        <button
+          type="button"
+          onClick={onToggleSlippage}
+          className="text-cipher-cyan hover:text-cipher-cyan/80 transition-colors"
+        >
+          {showSlippage ? 'Done' : 'Adjust'}
+        </button>
+      </div>
+
+      {showSlippage && (
+        <div className="px-3 pb-2.5 flex gap-1.5 border-t border-[var(--color-border-subtle)] pt-2">
+          {[{ label: '0.5%', value: 50 }, { label: '1%', value: 100 }, { label: '2%', value: 200 }].map((opt) => (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => onSetSlippage(opt.value)}
+              className={`px-2.5 py-1 rounded-md text-[11px] font-mono transition-colors ${
+                slippageBps === opt.value
+                  ? 'bg-cipher-cyan/15 text-cipher-cyan border border-cipher-cyan/30'
+                  : 'text-muted hover:text-secondary border border-[var(--color-border-subtle)]'
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function Form({
   mode, amount, zecAddress, refundAddress, slippageBps, selectedToken,
-  tokens, tokensLoading, recommendations, balance, previewZec, loading, error,
+  tokens, tokensLoading, balance, balanceLoading, previewZec, previewLoading, loading, error,
   walletAddress, insufficientBalance, onSelectToken, onSetAmount, onSetZecAddr,
   onSetRefundAddr, onSetSlippage, onSubmit, onGoConnect, showSlippage, onToggleSlippage,
+  showBuyWithCard, onBuyWithCard, buyWithCardLoading, buyWithCardError,
 }: FormProps) {
   const zecAddrError = validateZecAddress(zecAddress);
   const effectiveRefund = refundAddress || walletAddress || '';
@@ -62,51 +175,80 @@ export function Form({
   const ctaText = ctaLabel({ loading, amount, zecAddress, refundAddress: effectiveRefund, mode, insufficientBalance });
   const { price: zecPrice } = useZecPrice();
 
-  const stepIdx = !amount ? 0 : (!zecAddress || !effectiveRefund) ? 1 : 2;
+  const [addressEngaged, setAddressEngaged] = useState(false);
+
+  useEffect(() => {
+    if (!amount || parseFloat(amount) <= 0) setAddressEngaged(false);
+  }, [amount]);
+
+  const stepIdx = getFormStepIndex(amount, zecAddress, effectiveRefund, addressEngaged);
+  const balanceNum = balance != null ? parseFloat(balance) : null;
+  const hasValidAmount = !!(amount && parseFloat(amount) > 0);
+  const zeroBalance = balanceNum === 0;
+  const showCardPromo = !!(showBuyWithCard && onBuyWithCard && mode === 'wallet' && !balanceLoading && zeroBalance);
+  const showCardInline = !!(showBuyWithCard && onBuyWithCard && !showCardPromo);
+
+  const receiveZec = previewZec && amount ? previewZec : null;
+  const receiveUsd =
+    receiveZec && zecPrice ? (parseFloat(receiveZec) * zecPrice).toFixed(2) : null;
 
   return (
-    <div className="space-y-5">
-      <Stepper steps={['Pick asset', 'Addresses', 'Get quote']} current={stepIdx} />
+    <div className="space-y-3.5">
+      <Stepper steps={['Send', 'Receive', 'Quote']} current={stepIdx} />
 
       {mode === 'manual' && (
-        <div className="flex items-center gap-2 text-[11px] font-mono text-muted">
+        <div className="flex items-center gap-2 text-xs font-sans text-muted">
           <span>Manual mode</span>
           <span className="text-muted/30">·</span>
-          <button onClick={onGoConnect} className="text-cipher-cyan hover:underline">Connect instead?</button>
+          <button type="button" onClick={onGoConnect} className="text-cipher-cyan hover:underline">
+            Connect instead?
+          </button>
         </div>
       )}
 
-      {/* Token picker */}
-      <div>
-        <label className="text-[10px] font-mono text-muted uppercase tracking-wider mb-1.5 block">You send</label>
-        <TokenPicker tokens={tokens} selected={selectedToken} loading={tokensLoading} onSelect={onSelectToken} />
-      </div>
-
-      {/* Amount */}
-      <div>
-        <div className="flex items-baseline justify-between mb-1.5">
-          <label className="text-[10px] font-mono text-muted uppercase tracking-wider">Amount</label>
-          {mode === 'wallet' && balance && (
-            <div className="flex items-center gap-1.5">
-              <span className="text-[11px] font-mono text-muted">
-                {parseFloat(balance).toLocaleString(undefined, { maximumFractionDigits: 4 })} {selectedToken.token}
-              </span>
-              <button
-                onClick={() => onSetAmount(String(parseFloat(balance) * 0.5))}
-                className="px-1.5 py-0.5 rounded text-[10px] font-mono text-cipher-cyan bg-cipher-cyan/5 hover:bg-cipher-cyan/10 transition-colors"
-              >
-                50%
-              </button>
-              <button
-                onClick={() => onSetAmount(balance)}
-                className="px-1.5 py-0.5 rounded text-[10px] font-mono text-cipher-cyan bg-cipher-cyan/5 hover:bg-cipher-cyan/10 transition-colors"
-              >
-                MAX
-              </button>
-            </div>
-          )}
+      {/* You send — token + amount (Uniswap-style) */}
+      <div className="input-shell overflow-visible">
+        <div className="flex items-center justify-between gap-2 px-3 py-1.5 border-b border-[var(--color-border-subtle)]">
+          <span className="text-[10px] font-mono text-muted uppercase tracking-wider">You send</span>
+          <div className="flex items-center gap-1.5">
+            {mode === 'wallet' && balanceLoading && (
+              <span className="text-[10px] font-mono text-muted animate-pulse">Balance…</span>
+            )}
+            {mode === 'wallet' && !balanceLoading && balance != null && (
+              <>
+                <span className="text-[10px] font-mono text-secondary">
+                  {balanceNum!.toLocaleString(undefined, { maximumFractionDigits: 4 })}
+                </span>
+                {balanceNum! > 0 && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => onSetAmount(String(balanceNum! * 0.5))}
+                      className="px-1 py-0.5 rounded text-[10px] font-mono text-muted hover:text-primary transition-colors"
+                    >
+                      50%
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onSetAmount(balance!)}
+                      className="px-1 py-0.5 rounded text-[10px] font-mono text-muted hover:text-primary transition-colors"
+                    >
+                      MAX
+                    </button>
+                  </>
+                )}
+              </>
+            )}
+          </div>
         </div>
-        <div className="flex rounded-lg bg-glass-3 border border-glass-6 focus-within:border-cipher-cyan/40 focus-within:shadow-[0_0_0_3px_rgb(var(--color-cyan-rgb)_/_0.06)] transition-all">
+        <div className="flex items-stretch min-h-[52px]">
+          <TokenPicker
+            variant="inline"
+            tokens={tokens}
+            selected={selectedToken}
+            loading={tokensLoading}
+            onSelect={onSelectToken}
+          />
           <input
             type="text"
             inputMode="decimal"
@@ -115,178 +257,126 @@ export function Form({
               const v = e.target.value;
               if (v === '' || /^\d*\.?\d*$/.test(v)) onSetAmount(v);
             }}
-            placeholder="0.00"
-            className="flex-1 min-w-0 px-4 py-3 bg-transparent text-primary font-mono text-lg placeholder:text-muted/30 focus:outline-none"
+            placeholder="0"
+            className="flex-1 min-w-0 px-3 py-2 bg-transparent text-primary font-mono text-xl text-right placeholder:text-muted/30 focus:outline-none"
           />
-          <div className="flex items-center gap-1.5 px-3 shrink-0">
-            <TokenChainIcon token={selectedToken.token} chain={selectedToken.chain} size={16} />
-            <span className="text-[11px] font-mono text-muted">{selectedToken.token}</span>
-          </div>
         </div>
-
-        {/* Live preview */}
-        {previewZec && amount && (
-          <p className="mt-1.5 text-[11px] font-mono text-secondary">
-            ≈ {previewZec} ZEC
-            {zecPrice ? <span className="text-muted ml-1.5">(≈ ${(parseFloat(previewZec) * zecPrice).toFixed(2)})</span> : null}
-          </p>
-        )}
-
-        {/* Recommendation chips */}
-        {recommendations && recommendations.amounts.length > 0 && (() => {
-          const chips = recommendations.amounts
-            .filter(a => a.sourceAmount && a.sourceAmount > 0)
-            .filter(a => !a.sourceToken || a.sourceToken.toUpperCase() === selectedToken.token.toUpperCase())
-            .slice(0, 4);
-          if (chips.length === 0) return null;
-          return (
-            <div className="mt-3">
-              <div className="flex items-center gap-1.5 mb-1.5">
-                <span className="w-1 h-1 rounded-full bg-cipher-green" />
-                <span className="text-[10px] font-mono text-muted leading-none">
-                  Suggested amounts <span className="text-muted/60">— green blends best with recent shielded swaps</span>
-                </span>
-              </div>
-              <div className="flex flex-wrap gap-1.5">
-              {chips.map((rec, i) => {
-                const label = getBlendingLabel(rec.blendingScore, rec.dualBlendScore);
-                const token = rec.sourceToken || selectedToken.token;
-                return (
-                  <button
-                    key={i}
-                    onClick={() => onSetAmount(String(rec.sourceAmount))}
-                    className={`group flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-mono transition-all border ${
-                      label === 'high'
-                        ? 'border-cipher-green/30 text-cipher-green hover:bg-cipher-green/10'
-                        : label === 'medium'
-                        ? 'border-cipher-yellow/30 text-cipher-yellow hover:bg-cipher-yellow/10'
-                        : 'border-glass-12 text-muted hover:bg-glass-6'
-                    }`}
-                    title={`≈${rec.amountZec} ZEC · ${rec.txCount} shielding txs · ${rec.chainSwapCount || 0} ${selectedToken.chain.toUpperCase()} swaps`}
-                  >
-                    {formatRecAmount(rec.sourceAmount!, token)} {token}
-                  </button>
-                );
-              })}
-              </div>
-            </div>
-          );
-        })()}
       </div>
 
-      {/* Swap arrow divider */}
-      <div className="flex items-center gap-3 -my-1">
-        <div className="flex-1 h-px bg-glass-4" />
-        <div className="w-7 h-7 rounded-full bg-glass-4 flex items-center justify-center">
-          <svg className="w-3.5 h-3.5 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
-          </svg>
-        </div>
-        <div className="flex-1 h-px bg-glass-4" />
-      </div>
-
-      {/* ZEC address */}
-      <div>
-        <label className="text-[10px] font-mono text-muted uppercase tracking-wider mb-1.5 block">
-          Your ZEC address
-        </label>
-        <div className="flex rounded-lg bg-glass-3 border border-glass-6 focus-within:border-cipher-cyan/40 focus-within:shadow-[0_0_0_3px_rgb(var(--color-cyan-rgb)_/_0.06)] transition-all">
-          <input
-            type="text"
-            value={zecAddress}
-            onChange={(e) => onSetZecAddr(e.target.value)}
-            placeholder="Paste t1 or u1 address"
-            aria-describedby={zecAddress && zecAddrError ? 'zec-addr-error' : undefined}
-            className="flex-1 min-w-0 px-4 py-3 bg-transparent text-primary font-mono text-sm placeholder:text-muted/30 focus:outline-none"
-          />
-          <div className="flex items-center gap-1.5 px-3 shrink-0">
-            <TokenChainIcon token="zec" chain="zec" size={16} />
-            <span className="text-[11px] font-mono text-muted">ZEC</span>
-          </div>
-        </div>
-        {zecAddress && zecAddrError && (
-          <p id="zec-addr-error" className="mt-1 text-[11px] text-red-400 font-mono">{zecAddrError}</p>
-        )}
-      </div>
-
-      {/* Refund / wallet info */}
-      {mode === 'wallet' && walletAddress ? (
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-1.5 text-[11px] font-mono text-muted min-w-0">
-            <span className="w-1.5 h-1.5 rounded-full bg-cipher-green shrink-0" />
-            <span className="truncate">Returns to {walletAddress.slice(0, 6)}...{walletAddress.slice(-4)} if swap fails</span>
-          </div>
-          <button onClick={onToggleSlippage} className="text-[11px] font-mono text-muted hover:text-secondary transition-colors shrink-0">
-            {showSlippage ? 'Less' : 'More options'}
-          </button>
-        </div>
-      ) : (
-        <div>
-          <div className="flex items-center justify-between mb-1.5">
-            <label className="text-[10px] font-mono text-muted uppercase tracking-wider">
-              Your {selectedToken.chainLabel} address
-            </label>
-            <button onClick={onToggleSlippage} className="text-[11px] font-mono text-muted hover:text-secondary transition-colors">
-              {showSlippage ? 'Less' : 'More options'}
+      {(showCardPromo || showCardInline || buyWithCardError) && (
+        <div className="space-y-1.5 -mt-1">
+          {showCardPromo && (
+            <button
+              type="button"
+              onClick={onBuyWithCard}
+              disabled={buyWithCardLoading}
+              className="w-full py-2 rounded-lg text-[11px] font-mono border border-cipher-cyan/30 text-cipher-cyan hover:bg-cipher-cyan/10 transition-colors disabled:opacity-50"
+            >
+              {buyWithCardLoading ? 'Opening MoonPay…' : `Buy ${selectedToken.token} with card`}
             </button>
-          </div>
-          <input
-            type="text"
-            value={refundAddress}
-            onChange={(e) => onSetRefundAddr(e.target.value)}
-            placeholder={`The address you're sending from`}
-            className="w-full px-4 py-3 rounded-lg bg-glass-3 border border-glass-6 text-primary font-mono text-sm placeholder:text-muted/30 focus:outline-none focus:border-cipher-cyan/40 focus:shadow-[0_0_0_3px_rgb(var(--color-cyan-rgb)_/_0.06)] transition-all"
-          />
-          {!refundAddress && (
-            <p className="mt-1.5 text-[11px] font-mono text-muted/70 leading-relaxed">
-              Paste the {selectedToken.chainLabel} address you&apos;ll send from. Funds return here if the swap can&apos;t complete.
-            </p>
+          )}
+          {showCardInline && (
+            <button
+              type="button"
+              onClick={onBuyWithCard}
+              disabled={buyWithCardLoading}
+              className="text-[11px] font-sans text-muted hover:text-cipher-cyan transition-colors disabled:opacity-50"
+            >
+              {buyWithCardLoading ? 'Opening…' : 'Buy with card →'}
+            </button>
+          )}
+          {buyWithCardError && (
+            <p className="text-[11px] font-mono text-red-400">{buyWithCardError}</p>
           )}
         </div>
       )}
 
-      {/* Slippage */}
-      {showSlippage && (
-        <div className="animate-fade-in">
-          <label className="text-[10px] font-mono text-muted uppercase tracking-wider mb-2 block">Slippage</label>
-          <div className="flex gap-1.5">
-            {[{ label: '0.5%', value: 50 }, { label: '1%', value: 100 }, { label: '2%', value: 200 }].map(opt => (
-              <button
-                key={opt.value}
-                onClick={() => onSetSlippage(opt.value)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-mono transition-all ${
-                  slippageBps === opt.value
-                    ? 'bg-cipher-cyan/10 text-cipher-cyan'
-                    : 'text-muted hover:text-secondary bg-glass-2 hover:bg-glass-4'
-                }`}
-              >
-                {opt.label}
-              </button>
-            ))}
+      {/* Arrow */}
+      <div className="flex justify-center -my-1.5">
+        <div className="w-6 h-6 rounded-full surface-inset flex items-center justify-center">
+          <svg className="w-3 h-3 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+          </svg>
+        </div>
+      </div>
+
+      {/* You receive + ZEC address */}
+      <div className="input-shell">
+        <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-[var(--color-border-subtle)]">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <TokenChainIcon token="zec" chain="zec" size={18} />
+            <span className="text-[10px] font-mono text-muted uppercase tracking-wider">You receive</span>
+          </div>
+          <div className="text-right shrink-0 min-h-[2.25rem] flex flex-col items-end justify-center">
+            {previewLoading && hasValidAmount ? (
+              <span className="flex items-center gap-1.5 text-muted">
+                <span
+                  className="w-3 h-3 rounded-full border-2 border-glass-12 border-t-cipher-cyan animate-spin"
+                  aria-hidden
+                />
+                <span className="text-[11px] font-mono">Estimating…</span>
+              </span>
+            ) : (
+              <>
+                <span
+                  className={`font-mono font-semibold tabular-nums text-sm ${
+                    receiveZec ? 'text-primary' : 'text-muted/40'
+                  }`}
+                >
+                  {receiveZec ? `≈ ${receiveZec} ZEC` : '— ZEC'}
+                </span>
+                {receiveUsd && (
+                  <span className="block text-[10px] font-mono text-muted">≈ ${receiveUsd}</span>
+                )}
+              </>
+            )}
           </div>
         </div>
-      )}
+        <input
+          type="text"
+          value={zecAddress}
+          onChange={(e) => {
+            setAddressEngaged(true);
+            onSetZecAddr(e.target.value);
+          }}
+          onFocus={() => setAddressEngaged(true)}
+          placeholder="ZEC address (t1 or u1)"
+          aria-describedby={zecAddress && zecAddrError ? 'zec-addr-error' : undefined}
+          className="w-full px-3 py-2.5 bg-transparent text-primary font-mono text-sm placeholder:text-muted/40 focus:outline-none"
+        />
+        {zecAddress && zecAddrError && (
+          <p id="zec-addr-error" className="px-3 pb-2 text-[11px] text-red-400 font-mono -mt-1">
+            {zecAddrError}
+          </p>
+        )}
+      </div>
 
-      {/* Error */}
+      <SwapOptionsBar
+        mode={mode}
+        walletAddress={walletAddress}
+        refundAddress={refundAddress}
+        selectedToken={selectedToken}
+        slippageBps={slippageBps}
+        showSlippage={showSlippage}
+        onToggleSlippage={onToggleSlippage}
+        onSetRefundAddr={onSetRefundAddr}
+        onSetSlippage={onSetSlippage}
+      />
+
       {error && (
-        <div className="px-4 py-3 rounded-lg bg-red-500/[0.06] border border-red-500/20 text-xs font-mono text-red-400">
+        <div className="px-3 py-2 rounded-lg bg-red-500/[0.06] border border-red-500/20 text-xs font-mono text-red-400">
           {error}
         </div>
       )}
 
-      {/* CTA */}
-      <div className="sm:static sticky bottom-0 z-10 bg-[var(--color-surface-solid)] sm:bg-transparent pt-2 sm:pt-0 -mx-4 px-4 sm:mx-0 sm:px-0 pb-2 sm:pb-0">
-        <button
-          onClick={onSubmit}
-          disabled={ctaDisabled}
-          className="w-full py-3.5 rounded-lg font-mono font-semibold text-sm transition-all duration-150 disabled:opacity-30 disabled:cursor-not-allowed bg-cipher-cyan-bright text-[#08090F] hover:shadow-[0_4px_20px_rgb(var(--color-cyan-rgb)_/_0.25)] hover:-translate-y-[1px] active:translate-y-0 active:shadow-none"
-        >
+      <div className="sm:static sticky bottom-0 z-10 surface-solid sm:!bg-transparent sm:!border-0 -mx-4 px-4 sm:mx-0 sm:px-0 pt-1.5 sm:pt-0 pb-2 sm:pb-0">
+        <button type="button" onClick={onSubmit} disabled={ctaDisabled} className="btn-primary">
           {ctaText}
         </button>
       </div>
 
-      <p className="text-center text-[10px] font-mono text-muted/60">
-        Powered by NEAR Intents · Slippage: {slippageBps / 100}%
+      <p className="text-center text-[10px] font-sans text-muted -mt-1">
+        Powered by NEAR Intents
       </p>
     </div>
   );

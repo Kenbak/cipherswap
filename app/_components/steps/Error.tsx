@@ -56,7 +56,7 @@ export function Error({ reason, hasRetry, refundAddress, onRetry, onReset }: Err
         {hasRetry && (
           <button
             onClick={onRetry}
-            className="flex-[2] py-3 rounded-lg font-mono font-semibold text-sm bg-cipher-cyan-bright text-[#08090F] hover:shadow-[0_4px_20px_rgb(var(--color-cyan-rgb)_/_0.25)] hover:-translate-y-[1px] active:translate-y-0 transition-all"
+            className="flex-[2] btn-primary !w-auto"
           >
             Retry with same params
           </button>

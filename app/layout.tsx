@@ -3,6 +3,7 @@ import localFont from "next/font/local";
 import "./globals.css";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
+import { CipherBackground } from "@/components/CipherBackground";
 import { ZecPriceProvider } from "./_components/ZecPriceContext";
 
 const geistSans = localFont({
@@ -51,14 +52,17 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full`}>
       <body className="min-h-full flex flex-col antialiased">
+        <CipherBackground />
         <ZecPriceProvider>
-          <Navbar />
+          <div className="relative z-10 flex flex-col min-h-full">
+            <Navbar />
 
-          <main className="flex-1">
-            {children}
-          </main>
+            <main className="flex-1">
+              {children}
+            </main>
 
-          <Footer />
+            <Footer />
+          </div>
         </ZecPriceProvider>
       </body>
     </html>

@@ -14,11 +14,16 @@ export function useBalance(
   refreshKey: number = 0,
 ) {
   const [balance, setBalance] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     setBalance(null);
-    if (!wallet.connected) return;
+    if (!wallet.connected) {
+      setLoading(false);
+      return;
+    }
 
+    setLoading(true);
     let cancelled = false;
     const chainKey = selectedToken.chain;
     const isEvm = EVM_CHAINS.includes(chainKey);
@@ -33,11 +38,14 @@ export function useBalance(
       } else {
         bal = await wallet.getNativeBalance(isEvm ? chainKey : undefined);
       }
-      if (!cancelled) setBalance(bal);
+      if (!cancelled) {
+        setBalance(bal);
+        setLoading(false);
+      }
     };
     fetchBal();
     return () => { cancelled = true; };
   }, [wallet.connected, wallet.address, selectedToken, refreshKey]);
 
-  return balance;
+  return { balance, loading };
 }

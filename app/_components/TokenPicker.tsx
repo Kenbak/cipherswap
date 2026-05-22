@@ -9,12 +9,20 @@ interface TokenPickerProps {
   selected: SourceToken;
   loading: boolean;
   onSelect: (token: SourceToken) => void;
+  variant?: 'default' | 'inline';
 }
 
-export function TokenPicker({ tokens, selected, loading, onSelect }: TokenPickerProps) {
+export function TokenPicker({
+  tokens,
+  selected,
+  loading,
+  onSelect,
+  variant = 'default',
+}: TokenPickerProps) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
   const ref = useRef<HTMLDivElement>(null);
+  const inline = variant === 'inline';
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -27,46 +35,86 @@ export function TokenPicker({ tokens, selected, loading, onSelect }: TokenPicker
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  const filtered = tokens.filter(t => {
+  const filtered = tokens.filter((t) => {
     if (!search) return true;
     const q = search.toLowerCase();
-    return t.token.toLowerCase().includes(q) || t.chainLabel.toLowerCase().includes(q) || t.chain.includes(q);
+    return (
+      t.token.toLowerCase().includes(q) ||
+      t.chainLabel.toLowerCase().includes(q) ||
+      t.chain.includes(q)
+    );
   });
 
   return (
-    <div className="relative" ref={ref}>
+    <div className={`relative ${inline ? 'shrink-0' : ''}`} ref={ref}>
       <button
-        onClick={() => { setOpen(!open); setSearch(''); }}
-        className="w-full flex items-center gap-3 px-4 py-3 rounded-lg bg-glass-3 border border-glass-6 hover:border-cipher-cyan/30 transition-all"
+        type="button"
+        onClick={() => {
+          setOpen(!open);
+          setSearch('');
+        }}
+        className={
+          inline
+            ? 'flex items-center gap-2 h-full px-3 py-2.5 border-r border-[var(--color-border-subtle)] hover:bg-[var(--color-inset)] transition-colors'
+            : 'w-full flex items-center gap-3 px-4 py-3 rounded-lg bg-glass-3 border border-glass-6 hover:border-cipher-cyan/30 transition-all'
+        }
       >
-        <TokenChainIcon token={selected.token} chain={selected.chain} size={28} />
-        <div className="flex-1 text-left">
-          <div className="text-sm font-mono font-semibold text-primary leading-tight">{selected.token}</div>
-          <div className="text-[11px] font-mono text-muted leading-tight mt-0.5">{selected.chainLabel}</div>
+        <TokenChainIcon token={selected.token} chain={selected.chain} size={inline ? 22 : 28} />
+        <div className={inline ? 'text-left min-w-0' : 'flex-1 text-left'}>
+          <div
+            className={`font-mono font-semibold text-primary leading-tight ${
+              inline ? 'text-sm' : 'text-sm'
+            }`}
+          >
+            {selected.token}
+          </div>
+          {!inline && (
+            <div className="text-[11px] font-mono text-muted leading-tight mt-0.5">
+              {selected.chainLabel}
+            </div>
+          )}
         </div>
-        <span className="text-[10px] font-mono text-muted/60 uppercase tracking-wider mr-1">Change</span>
-        <svg className="w-3.5 h-3.5 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        {!inline && (
+          <span className="text-[10px] font-mono text-muted/60 uppercase tracking-wider mr-1">
+            Change
+          </span>
+        )}
+        <svg
+          className={`text-muted shrink-0 ${inline ? 'w-3 h-3' : 'w-3.5 h-3.5'}`}
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+          aria-hidden
+        >
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
         </svg>
       </button>
 
       {open && (
         <>
-          <div className="fixed inset-0 bg-black/40 z-40 sm:hidden" onClick={() => { setOpen(false); setSearch(''); }} />
+          <div
+            className="fixed inset-0 bg-black/40 z-40 sm:hidden"
+            onClick={() => {
+              setOpen(false);
+              setSearch('');
+            }}
+          />
           <div
             role="dialog"
             aria-modal="true"
             aria-label="Select token"
-            className="fixed inset-x-0 bottom-0 sm:absolute sm:inset-auto sm:left-0 sm:top-full sm:mt-1 z-50 sm:w-[320px] max-h-[85vh] sm:max-h-[360px] rounded-t-2xl sm:rounded-lg bg-[var(--color-surface-solid)] border border-glass-8 shadow-[0_8px_32px_rgba(0,0,0,0.5)] overflow-hidden animate-fade-in"
+            className={`fixed inset-x-0 bottom-0 sm:absolute sm:inset-auto z-50 sm:w-[320px] max-h-[85vh] sm:max-h-[360px] rounded-t-2xl sm:rounded-lg surface-solid shadow-[0_8px_32px_rgba(0,0,0,0.5)] overflow-hidden animate-fade-in ${
+              inline ? 'sm:left-0 sm:top-full sm:mt-1' : 'sm:left-0 sm:top-full sm:mt-1'
+            }`}
           >
-            <div className="p-2 border-b border-glass-4">
+            <div className="p-2 border-b border-[var(--color-border-subtle)]">
               <input
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search token or chain..."
                 autoFocus
-                className="w-full px-3 py-2 rounded-lg bg-glass-4 text-primary font-mono text-sm placeholder:text-muted/40 focus:outline-none"
+                className="input-shell w-full px-3 py-2 text-primary font-mono text-sm placeholder:text-muted/40 focus:outline-none"
               />
             </div>
             <div className="overflow-y-auto max-h-[calc(85vh-48px)] sm:max-h-[340px]">
@@ -78,16 +126,17 @@ export function TokenPicker({ tokens, selected, loading, onSelect }: TokenPicker
               ) : filtered.length === 0 ? (
                 <div className="px-3 py-6 text-center text-xs font-mono text-muted">No tokens found</div>
               ) : (
-                filtered.map(t => (
+                filtered.map((t) => (
                   <button
                     key={t.id}
+                    type="button"
                     onClick={() => {
                       onSelect(t);
                       setOpen(false);
                       setSearch('');
                     }}
                     className={`w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors ${
-                      selected.id === t.id ? 'bg-glass-6' : 'hover:bg-glass-3'
+                      selected.id === t.id ? 'bg-[var(--color-inset)]' : 'hover:bg-[var(--color-inset)]'
                     }`}
                   >
                     <TokenChainIcon token={t.token} chain={t.chain} size={28} />
@@ -96,8 +145,19 @@ export function TokenPicker({ tokens, selected, loading, onSelect }: TokenPicker
                       <div className="text-[11px] font-mono text-muted">{t.chainLabel}</div>
                     </div>
                     {selected.id === t.id && (
-                      <svg className="w-4 h-4 text-cipher-cyan shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      <svg
+                        className="w-4 h-4 text-cipher-cyan shrink-0"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                        aria-hidden
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M5 13l4 4L19 7"
+                        />
                       </svg>
                     )}
                   </button>

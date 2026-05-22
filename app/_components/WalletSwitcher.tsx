@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import type { UseWalletReturn, DetectedWallet } from '@/hooks/useWallet';
 
-function WalletIcon({ wallet: w, size = 24 }: { wallet: DetectedWallet; size?: number }) {
+export function WalletIcon({ wallet: w, size = 24 }: { wallet: DetectedWallet; size?: number }) {
   if (w.icon) {
     return <img src={w.icon} alt="" className="rounded-full" style={{ width: size, height: size }} />;
   }
@@ -132,5 +132,3 @@ export function WalletSwitcher({ wallet, chainWallets, selectedChainLabel, onCon
     </div>
   );
 }
-
-export { WalletIcon };

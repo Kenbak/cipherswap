@@ -12,6 +12,8 @@
   --color-elevated: #0E1018;
   --color-surface: rgba(20, 22, 31, 0.55);
   --color-surface-solid: #14161F;
+  --color-input: #12151E;
+  --color-inset: #161922;
   --color-hover: #1A1D28;
   --color-active: #22252F;
   --color-border: rgba(30, 41, 59, 0.6);
@@ -67,6 +69,8 @@
   --color-elevated: #ECEEF2;
   --color-surface: #F8FAFC;
   --color-surface-solid: #F8FAFC;
+  --color-input: #FFFFFF;
+  --color-inset: #F1F5F9;
   --color-hover: #ECEEF2;
   --color-active: #E2E8F0;
   --color-border: #D8DEE6;
@@ -190,6 +194,185 @@
   .light .modal-backdrop {
     background-color: rgba(0, 0, 0, 0.5);
   }
+
+  /* Solid surfaces — avoid stacking translucent glass on translucent card */
+  .surface-solid {
+    background-color: var(--color-surface-solid);
+    border: 1px solid var(--color-border-subtle);
+  }
+
+  .surface-inset {
+    background-color: var(--color-inset);
+    border: 1px solid var(--color-border-subtle);
+  }
+
+  .input-shell {
+    background-color: var(--color-input);
+    border: 1px solid var(--color-border-subtle);
+    border-radius: 8px;
+    transition: border-color 150ms ease, box-shadow 150ms ease;
+  }
+
+  .input-shell:focus-within {
+    border-color: rgb(var(--color-cyan-rgb) / 0.4);
+    box-shadow: 0 0 0 3px rgb(var(--color-cyan-rgb) / 0.06);
+  }
+
+  .btn-primary {
+    display: block;
+    width: 100%;
+    padding: 0.875rem 1rem;
+    border-radius: 8px;
+    border: none;
+    font-family: var(--font-geist-mono), monospace;
+    font-size: 0.875rem;
+    font-weight: 600;
+    line-height: 1.25;
+    cursor: pointer;
+    transition: background-color 150ms ease, box-shadow 150ms ease, transform 150ms ease;
+    background-color: var(--color-cyan);
+    color: #08090F;
+  }
+
+  .btn-primary:not(:disabled):hover {
+    box-shadow: 0 4px 20px rgb(var(--color-cyan-rgb) / 0.25);
+    transform: translateY(-1px);
+  }
+
+  .btn-primary:not(:disabled):active {
+    transform: translateY(0);
+    box-shadow: none;
+  }
+
+  .btn-primary:disabled {
+    background-color: var(--color-active);
+    color: var(--color-text-muted);
+    cursor: not-allowed;
+    box-shadow: none;
+    transform: none;
+  }
+}
+
+@layer components {
+  /* ── Cipherpunk ambient background (discreet) ── */
+  .cipher-bg {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    overflow: hidden;
+    background-color: var(--color-bg);
+  }
+
+  .cipher-bg__grid {
+    position: absolute;
+    inset: -1px;
+    opacity: 0.35;
+    background-image:
+      linear-gradient(rgb(var(--color-cyan-rgb) / 0.045) 1px, transparent 1px),
+      linear-gradient(90deg, rgb(var(--color-cyan-rgb) / 0.045) 1px, transparent 1px);
+    background-size: 56px 56px;
+    mask-image: radial-gradient(ellipse 85% 70% at 50% 38%, black 15%, transparent 72%);
+  }
+
+  .cipher-bg__orb {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(72px);
+    will-change: transform;
+  }
+
+  .cipher-bg__orb--cyan {
+    width: min(52vw, 520px);
+    height: min(52vw, 520px);
+    top: -12%;
+    left: -8%;
+    background: radial-gradient(circle, rgb(var(--color-cyan-rgb) / 0.22) 0%, transparent 68%);
+    animation: cipher-drift-a 28s ease-in-out infinite;
+  }
+
+  .cipher-bg__orb--green {
+    width: min(44vw, 440px);
+    height: min(44vw, 440px);
+    bottom: -18%;
+    right: -6%;
+    background: radial-gradient(circle, rgb(var(--color-green-rgb) / 0.14) 0%, transparent 70%);
+    animation: cipher-drift-b 34s ease-in-out infinite;
+  }
+
+  .cipher-bg__orb--yellow {
+    width: min(28vw, 280px);
+    height: min(28vw, 280px);
+    top: 42%;
+    right: 12%;
+    background: radial-gradient(circle, rgb(var(--color-yellow-rgb) / 0.09) 0%, transparent 72%);
+    animation: cipher-drift-c 40s ease-in-out infinite;
+  }
+
+  .cipher-bg__noise {
+    position: absolute;
+    inset: 0;
+    opacity: 0.035;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
+  .cipher-bg__scanlines {
+    position: absolute;
+    inset: 0;
+    opacity: 0.04;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(255, 255, 255, 0.03) 2px,
+      rgba(255, 255, 255, 0.03) 3px
+    );
+    mask-image: radial-gradient(ellipse 90% 80% at 50% 40%, black 10%, transparent 75%);
+  }
+
+  .cipher-bg__vignette {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(
+      ellipse 100% 90% at 50% 32%,
+      transparent 0%,
+      var(--color-bg) 78%
+    );
+  }
+
+  .light .cipher-bg__grid {
+    opacity: 0.2;
+    background-image:
+      linear-gradient(rgb(var(--color-cyan-rgb) / 0.06) 1px, transparent 1px),
+      linear-gradient(90deg, rgb(var(--color-cyan-rgb) / 0.06) 1px, transparent 1px);
+  }
+
+  .light .cipher-bg__orb--cyan {
+    background: radial-gradient(circle, rgb(var(--color-cyan-rgb) / 0.12) 0%, transparent 68%);
+  }
+
+  .light .cipher-bg__orb--green {
+    background: radial-gradient(circle, rgb(var(--color-green-rgb) / 0.08) 0%, transparent 70%);
+  }
+
+  .light .cipher-bg__scanlines {
+    opacity: 0.025;
+  }
+
+  @keyframes cipher-drift-a {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    50% { transform: translate(4%, 3%) scale(1.04); }
+  }
+
+  @keyframes cipher-drift-b {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    50% { transform: translate(-3%, -4%) scale(1.05); }
+  }
+
+  @keyframes cipher-drift-c {
+    0%, 100% { transform: translate(0, 0); opacity: 0.85; }
+    50% { transform: translate(-2%, 2%); opacity: 1; }
+  }
 }
 
 @layer utilities {
@@ -203,6 +386,10 @@
       animation-duration: 0.01ms !important;
       animation-iteration-count: 1 !important;
       transition-duration: 0.01ms !important;
+    }
+
+    .cipher-bg__orb {
+      animation: none !important;
     }
   }
 }

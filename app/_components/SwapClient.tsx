@@ -10,6 +10,8 @@ import { useQuoteCountdown } from '@/hooks/useQuoteCountdown';
 import { useStatusPolling } from '@/hooks/useStatusPolling';
 import { usePendingSwapRestore, usePendingSwapPersist } from '@/hooks/usePendingSwap';
 import { useRecommendations } from '@/hooks/useRecommendations';
+import { useMoonPay } from '@/hooks/useMoonPay';
+import { supportsMoonPayBuy } from '@/lib/moonpay';
 import { SectionLabel } from './SectionLabel';
 import { WalletSwitcher } from './WalletSwitcher';
 import { Sidebar } from './Sidebar';
@@ -44,14 +46,17 @@ export default function SwapClient({ initialTokens }: SwapClientProps) {
   const [txWalletError, setTxWalletError] = useState('');
   const [showSlippage, setShowSlippage] = useState(false);
   const [previewZec, setPreviewZec] = useState('');
+  const [previewLoading, setPreviewLoading] = useState(false);
   const [balanceRefresh, setBalanceRefresh] = useState(0);
   const previewTimer = useRef<NodeJS.Timeout | null>(null);
+  const previewRequestId = useRef(0);
 
   const selectedToken = (state.kind !== 'connect' && state.kind !== 'error')
     ? state.selectedToken
     : (state.kind === 'error' && state.retryFields ? state.retryFields.selectedToken : (initialTokens?.[0] || tokens[0]));
-  const balance = useBalance(wallet, selectedToken, balanceRefresh);
+  const { balance, loading: balanceLoading } = useBalance(wallet, selectedToken, balanceRefresh);
   const recommendations = useRecommendations(selectedToken);
+  const moonPay = useMoonPay();
 
   usePendingSwapRestore(dispatch, state);
   usePendingSwapPersist(state);
@@ -107,17 +112,26 @@ export default function SwapClient({ initialTokens }: SwapClientProps) {
     },
   );
 
-  // Live preview
+  // Live ZEC preview (debounced dry quote)
   useEffect(() => {
-    if (state.kind !== 'form' && state.kind !== 'connect') return;
-    if (state.kind === 'connect') { setPreviewZec(''); return; }
-    const amt = state.amount;
-    if (!amt || parseFloat(amt) <= 0) { setPreviewZec(''); return; }
+    if (state.kind !== 'form' && state.kind !== 'quoting') return;
 
+    const amt = state.amount;
+    if (!amt || parseFloat(amt) <= 0) {
+      setPreviewZec('');
+      setPreviewLoading(false);
+      return;
+    }
+
+    setPreviewLoading(true);
     if (previewTimer.current) clearTimeout(previewTimer.current);
+
+    const requestId = ++previewRequestId.current;
     previewTimer.current = setTimeout(async () => {
       try {
-        const amountSmallest = BigInt(Math.round(parseFloat(amt) * Math.pow(10, state.selectedToken.decimals))).toString();
+        const amountSmallest = BigInt(
+          Math.round(parseFloat(amt) * Math.pow(10, state.selectedToken.decimals)),
+        ).toString();
         const res = await fetch('/api/swap/quote', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -132,16 +146,32 @@ export default function SwapClient({ initialTokens }: SwapClientProps) {
           }),
         });
         const data = await res.json();
+        if (requestId !== previewRequestId.current) return;
         if (data.success) {
           const q = data.quote || data;
           const out = q.amountOut || q.estimatedAmountOut || data.amountOut;
-          if (out) setPreviewZec((parseInt(out) / Math.pow(10, ZEC_DECIMALS)).toFixed(4));
+          if (out) {
+            setPreviewZec((parseInt(out) / Math.pow(10, ZEC_DECIMALS)).toFixed(4));
+          }
         }
-      } catch {}
+      } catch {
+        /* keep previous preview on error */
+      } finally {
+        if (requestId === previewRequestId.current) {
+          setPreviewLoading(false);
+        }
+      }
     }, 500);
 
-    return () => { if (previewTimer.current) clearTimeout(previewTimer.current); };
-  }, [state.kind === 'connect' ? null : (state as any).amount, state.kind === 'connect' ? null : (state as any).selectedToken?.id]);
+    return () => {
+      if (previewTimer.current) clearTimeout(previewTimer.current);
+    };
+  }, [
+    state.kind,
+    state.kind === 'form' || state.kind === 'quoting' ? state.amount : '',
+    state.kind === 'form' || state.kind === 'quoting' ? state.selectedToken.id : '',
+    state.kind === 'form' || state.kind === 'quoting' ? state.slippageBps : 0,
+  ]);
 
   const handleChooseWallet = async (w: DetectedWallet) => {
     setWalletError('');
@@ -214,18 +244,37 @@ export default function SwapClient({ initialTokens }: SwapClientProps) {
     setError('');
     setTxWalletError('');
     setPreviewZec('');
+    setPreviewLoading(false);
     setBalanceRefresh(n => n + 1);
     localStorage.removeItem(PENDING_SWAP_KEY);
   };
 
+  const openMoonPayWidget = useCallback(() => {
+    if (!wallet.address) return;
+    moonPay.clearError();
+    moonPay.openBuyWidget({
+      walletAddress: wallet.address,
+      selectedToken,
+      onCompleted: () => setBalanceRefresh(n => n + 1),
+    });
+  }, [wallet.address, selectedToken, moonPay]);
+
   const currentAmount = (state.kind !== 'connect' && state.kind !== 'error') ? state.amount : '';
   const insufficientBalance = !!(wallet.connected && balance && currentAmount && parseFloat(currentAmount) > parseFloat(balance));
+  const showBuyWithCard = !!(
+    moonPay.isConfigured
+    && state.kind === 'form'
+    && state.mode === 'wallet'
+    && wallet.connected
+    && wallet.address
+    && supportsMoonPayBuy(selectedToken.chain, wallet.walletType)
+  );
 
   return (
-    <div className="max-w-5xl mx-auto grid grid-cols-1 lg:grid-cols-5 gap-6 animate-fade-in-up">
+    <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 animate-fade-in-up">
       {/* Main Swap Card */}
       <div className="lg:col-span-3">
-        <div className="card p-0 overflow-hidden">
+        <div className="card card-static p-0 overflow-hidden">
           {/* Card header */}
           <div className="px-5 py-3.5 border-b border-glass-4">
             <div className="flex items-center justify-between">
@@ -251,7 +300,7 @@ export default function SwapClient({ initialTokens }: SwapClientProps) {
             </div>
           </div>
 
-          <div className="p-5">
+          <div className="p-4 sm:p-5">
             <AnimatePresence mode="wait">
               {state.kind === 'connect' && (
                 <motion.div key="connect" {...motionProps}>
@@ -275,9 +324,10 @@ export default function SwapClient({ initialTokens }: SwapClientProps) {
                     selectedToken={state.selectedToken}
                     tokens={compatibleTokens}
                     tokensLoading={tokensLoading}
-                    recommendations={recommendations}
                     balance={balance}
+                    balanceLoading={balanceLoading}
                     previewZec={previewZec}
+                    previewLoading={previewLoading}
                     loading={loading || state.kind === 'quoting'}
                     error={error}
                     walletAddress={wallet.address}
@@ -291,6 +341,10 @@ export default function SwapClient({ initialTokens }: SwapClientProps) {
                     onGoConnect={handleReset}
                     showSlippage={showSlippage}
                     onToggleSlippage={() => setShowSlippage(!showSlippage)}
+                    showBuyWithCard={showBuyWithCard}
+                    onBuyWithCard={openMoonPayWidget}
+                    buyWithCardLoading={moonPay.loading}
+                    buyWithCardError={moonPay.error}
                   />
                 </motion.div>
               )}
@@ -356,9 +410,26 @@ export default function SwapClient({ initialTokens }: SwapClientProps) {
         </div>
       </div>
 
-      {/* Sidebar */}
-      <div className="lg:col-span-2">
-        <Sidebar state={state} />
+      {/* Sidebar — above swap on mobile during form for privacy tips */}
+      <div
+        className={`lg:col-span-2 ${
+          state.kind === 'form' || state.kind === 'quoting' ? 'order-first lg:order-none' : ''
+        }`}
+      >
+        <Sidebar
+          state={state}
+          recommendations={
+            state.kind === 'form' || state.kind === 'quoting' ? recommendations : null
+          }
+          currentAmount={
+            state.kind === 'form' || state.kind === 'quoting' ? state.amount : undefined
+          }
+          onSelectAmount={
+            state.kind === 'form' || state.kind === 'quoting'
+              ? (v) => dispatch({ type: 'set_amount', amount: v })
+              : undefined
+          }
+        />
       </div>
     </div>
   );
