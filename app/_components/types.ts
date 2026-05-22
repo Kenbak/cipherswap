@@ -161,6 +161,17 @@ export function validateZecAddress(addr: string): string | null {
   return null;
 }
 
+/** Balance chip in the send field — extra decimals for dust so it does not round to 0. */
+export function formatWalletBalance(amount: number | string): string {
+  const n = typeof amount === 'string' ? parseFloat(amount) : amount;
+  if (!Number.isFinite(n) || n === 0) return '0';
+  if (n >= 1_000) return n.toLocaleString(undefined, { maximumFractionDigits: 2 });
+  if (n >= 1) return n.toLocaleString(undefined, { maximumFractionDigits: 4 });
+  if (n >= 0.01) return n.toLocaleString(undefined, { maximumFractionDigits: 4 });
+  if (n >= 0.0001) return n.toFixed(6).replace(/\.?0+$/, '');
+  return n.toFixed(8).replace(/\.?0+$/, '');
+}
+
 export function formatRecAmount(amount: number, token: string): string {
   const t = token.toLowerCase();
   if (['usdc', 'usdt', 'dai', 'busd', 'tusd', 'usdp'].includes(t)) {

@@ -6,7 +6,7 @@ import { TokenPicker } from '../TokenPicker';
 import { Stepper } from '../Stepper';
 import { useZecPrice } from '../ZecPriceContext';
 import type { SourceToken, Mode } from '../types';
-import { validateZecAddress } from '../types';
+import { formatWalletBalance, validateZecAddress } from '../types';
 
 interface FormProps {
   mode: Mode;
@@ -217,7 +217,7 @@ export function Form({
             {mode === 'wallet' && !balanceLoading && balance != null && (
               <>
                 <span className="text-[10px] font-mono text-secondary">
-                  {balanceNum!.toLocaleString(undefined, { maximumFractionDigits: 4 })}
+                  {formatWalletBalance(balance!)}
                 </span>
                 {balanceNum! > 0 && (
                   <>

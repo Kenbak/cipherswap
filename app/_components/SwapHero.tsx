@@ -33,7 +33,7 @@ export function SwapHero() {
       ) : (
         <>
           <p className="mt-3 sm:mt-4 text-sm sm:text-base font-sans text-secondary leading-relaxed">
-            Cross-chain swap from ETH, BTC, SOL and 15+ more — privacy-aware, with
+            Cross-chain swap from ETH, BTC, SOL and 15+ more. Privacy-aware, with
             amount suggestions that blend into shielded ZEC traffic.
           </p>
           <div className="flex flex-wrap items-center gap-2 mt-4 sm:mt-5">
@@ -50,7 +50,7 @@ export function SwapHero() {
             ))}
           </div>
           <p className="mt-3 text-[11px] font-sans text-muted leading-relaxed max-w-2xl">
-            Cross-chain swap is wallet-to-wallet via NEAR Intents — no account with us.
+            Cross-chain swap is wallet-to-wallet via NEAR Intents, no account with us.
             Optional card top-up (MoonPay) is separate and may require ID verification.
           </p>
         </>
