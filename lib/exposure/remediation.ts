@@ -1,0 +1,37 @@
+/** One concrete fix per finding id, shown under each finding on the results page. */
+export const REMEDIATION: Record<string, string> = {
+  // Solana
+  'sns-registered': 'Keep names on a separate public wallet. Hold funds you want private elsewhere.',
+  'known-entity': 'Labeled addresses can’t be unlabeled. Move funds to a fresh wallet via shielded ZEC to break the link.',
+  'funded-by-cex': 'Withdraw from exchanges to a shielded Zcash address first, then fund new wallets from there.',
+  'frequent-cex': 'Route exchange deposits and withdrawals through shielded ZEC so they stop pointing at this wallet.',
+  'timezone-inference': 'Spread activity out, or batch it. Shielded transactions don’t publish timing tied to your address.',
+  'weekday-pattern': 'Vary when you transact. Scheduled or batched sends blur a work-week rhythm.',
+  'transaction-volume': 'Split activity across wallets that never interact directly.',
+  'unique-counterparties': 'Use separate wallets per context (trading, payments, savings) so one graph can’t map them all.',
+  'dapp-diversity': 'Use a dedicated wallet for DeFi, separate from the one that holds your savings.',
+  'account-age': 'History can’t be erased. Start fresh from a wallet funded through shielded ZEC.',
+  'nft-holdings': 'Keep identity-revealing NFTs (PFPs, POAPs) in a separate public wallet.',
+  'token-diversity': 'Consolidate holdings you want private into shielded ZEC.',
+  'dust-transactions': 'Don’t interact with unsolicited tokens. Hide or burn them.',
+  'token-approvals': 'Revoke approvals you no longer need.',
+  'multi-source-funding': 'Avoid funding one wallet from several of your own. Each transfer links them.',
+  // Bitcoin
+  'btc-address-reuse': 'Use a fresh receive address for every payment. Modern wallets do this automatically.',
+  'btc-heavy-reuse': 'Retire this address. Sharing it publicly (donations, invoices) makes it a permanent label.',
+  'btc-common-input': 'Enable coin control and never spend coins from different sources in one transaction.',
+  'btc-change-detectable': 'Use a wallet that matches change to the payment’s address type (e.g. Sparrow, Bitcoin Core).',
+  'btc-round-payments': 'Avoid round amounts, or pay exactly with no change output.',
+  'btc-consolidation': 'Consolidate only coins that are already linked, and never mix KYC and non-KYC coins.',
+  'btc-batch-funding': 'Treat exchange-withdrawn coins as tagged. Route them through shielded ZEC before using them elsewhere.',
+  'btc-known-exchange': 'Assume the exchange knows this address. Move funds out through shielded ZEC to break the trail.',
+  'btc-dust': 'Freeze dust in coin control so it is never spent with your other coins.',
+  'btc-legacy-script': 'Move to a native SegWit (bc1q) or Taproot (bc1p) wallet to blend with most traffic.',
+  'btc-public-balance': 'Bitcoin balances are always public. Shielded ZEC balances are encrypted by default.',
+  // Ethereum
+  'eth-ens': 'Keep the name on a public-facing wallet only. Hold private funds at an address with no name.',
+  'eth-deposit-address': 'That deposit address is tied to your exchange account forever. Send from a wallet you never use for anything else.',
+  'eth-mixer': 'Mixer use is itself a flag. Shielded ZEC gives you privacy by default without the stigma.',
+  'eth-spam': 'Never copy a recipient from your history; look-alike addresses are planted there. Ignore or hide spam tokens.',
+  'eth-public-balance': 'Every ERC-20 balance is public. Swap what you want private into shielded ZEC.',
+};

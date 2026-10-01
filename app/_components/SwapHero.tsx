@@ -1,59 +1,56 @@
-'use client';
+import Link from 'next/link';
 
-import { useWallet } from '@/hooks/useWallet';
+export interface NetworkStats {
+  volume24h: number;
+  swaps24h: number;
+  swapsAllTime: number;
+}
 
-const TRUST_PILLS = [
-  { label: 'Non-custodial swap', icon: '◇' },
-  { label: 'No KYC on swap', icon: '○' },
-  { label: 'Privacy-aware amounts', icon: '◆' },
-] as const;
+const CLAIMS = ['Non-custodial', 'No account', 'Auto-refund', 'Open source'];
 
-export function SwapHero() {
-  const wallet = useWallet();
-  const compact = wallet.connected;
+function compactUsd(n: number): string {
+  return n.toLocaleString('en-US', { style: 'currency', currency: 'USD', notation: 'compact', maximumFractionDigits: 1 });
+}
 
+export function SwapHero({ stats }: { stats: NetworkStats | null }) {
   return (
-    <div
-      className={`animate-fade-in max-w-3xl transition-all duration-normal ${
-        compact ? 'mb-5 sm:mb-6' : 'mb-8 sm:mb-10'
-      }`}
-    >
-      <h1
-        className={`font-bold font-sans text-primary tracking-tight leading-[1.05] transition-all duration-normal ${
-          compact ? 'text-2xl sm:text-3xl' : 'text-3xl sm:text-5xl'
-        }`}
-      >
-        Buy <span className="text-cipher-yellow font-mono">ZEC</span> from any chain.
+    <div className="max-w-xl lg:pt-4">
+      <p className="eyebrow">cross-chain → shielded zcash</p>
+      <h1 className="mt-3 font-mono font-bold text-primary tracking-tight leading-[1.05] text-[2rem] sm:text-5xl">
+        Buy <span className="text-cipher-gold">ZEC</span> from any chain.
       </h1>
+      <p className="mt-4 text-base sm:text-lg text-secondary">Swap from 15+ chains into shielded Zcash.</p>
 
-      {compact ? (
-        <p className="mt-2 text-sm font-sans text-secondary">
-          Swap to ZEC with privacy-aware amount suggestions.
-        </p>
-      ) : (
-        <>
-          <p className="mt-3 sm:mt-4 text-sm sm:text-base font-sans text-secondary leading-relaxed">
-            Cross-chain swap from ETH, BTC, SOL and 15+ more. Privacy-aware, with
-            amount suggestions that blend into shielded ZEC traffic.
-          </p>
-          <div className="flex flex-wrap items-center gap-2 mt-4 sm:mt-5">
-            {TRUST_PILLS.map(({ label, icon }) => (
-              <span
-                key={label}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-sans text-primary/85 border border-glass-8 bg-glass-3"
-              >
-                <span className="text-cipher-cyan/70 text-[10px]" aria-hidden>
-                  {icon}
-                </span>
-                {label}
-              </span>
-            ))}
+      <ul className="mt-6 flex flex-wrap gap-x-5 gap-y-2">
+        {CLAIMS.map((c) => (
+          <li key={c} className="flex items-center gap-2 text-sm text-primary">
+            <span className="w-1.5 h-1.5 bg-cipher-gold" aria-hidden />
+            {c}
+          </li>
+        ))}
+      </ul>
+      <Link href="/how-it-works" className="mt-3 inline-block text-sm text-muted hover:text-primary transition-colors">
+        How it works →
+      </Link>
+
+      {stats && (
+        <dl className="mt-10 hidden sm:flex gap-x-10" title="All ZEC cross-chain swaps through NEAR Intents, not only CipherSwap">
+          {[
+            { k: '24h volume', v: compactUsd(stats.volume24h) },
+            { k: '24h swaps', v: stats.swaps24h.toLocaleString('en-US') },
+            { k: 'all-time', v: stats.swapsAllTime.toLocaleString('en-US') },
+          ].map((s) => (
+            <div key={s.k}>
+              <dt className="term text-muted">{s.k}</dt>
+              <dd className="term !text-lg text-primary">{s.v}</dd>
+            </div>
+          ))}
+          <div className="self-end pb-1">
+            <a href="https://cipherscan.app/crosschain" target="_blank" rel="noopener noreferrer" className="term text-muted hover:text-primary">
+              NEAR Intents · ZecBlock ↗
+            </a>
           </div>
-          <p className="mt-3 text-[11px] font-sans text-muted leading-relaxed max-w-2xl">
-            Cross-chain swap is wallet-to-wallet via NEAR Intents, no account with us.
-            Optional card top-up (MoonPay) is separate and may require ID verification.
-          </p>
-        </>
+        </dl>
       )}
     </div>
   );

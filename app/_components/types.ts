@@ -1,5 +1,3 @@
-import type { DetectedWallet } from '@/hooks/useWallet';
-
 export interface SourceToken {
   id: string;
   chain: string;
@@ -8,6 +6,7 @@ export interface SourceToken {
   decimals: number;
   assetId: string;
   contractAddress?: string;
+  priceUsd?: number;
 }
 
 export interface CommonAmount {
@@ -30,31 +29,6 @@ export interface CommonAmountsResponse {
   tip: string;
 }
 
-export interface QuoteResponse {
-  success: boolean;
-  depositAddress?: string;
-  amountOut?: string;
-  estimatedAmountOut?: string;
-  deadline?: string;
-  error?: string;
-  quote?: any;
-}
-
-export interface PendingSwap {
-  depositAddress: string;
-  amount: string;
-  token: string;
-  chain: string;
-  chainLabel: string;
-  assetId: string;
-  decimals: number;
-  contractAddress?: string;
-  zecAddress: string;
-  estimatedZec: string;
-  txHash?: string;
-  createdAt: number;
-}
-
 export interface PopularPair {
   chain: string;
   token: string;
@@ -63,7 +37,7 @@ export interface PopularPair {
 
 export type Mode = 'wallet' | 'manual';
 
-export interface FormFields {
+export interface Draft {
   amount: string;
   zecAddress: string;
   refundAddress: string;
@@ -71,39 +45,9 @@ export interface FormFields {
   selectedToken: SourceToken;
 }
 
-export type SwapState =
-  | { kind: 'connect' }
-  | { kind: 'form'; mode: Mode } & FormFields
-  | { kind: 'quoting'; mode: Mode } & FormFields
-  | { kind: 'quote'; mode: Mode; depositAddress: string; estimatedZec: string; expiresAt: number } & FormFields
-  | { kind: 'waiting'; mode: Mode; depositAddress: string; estimatedZec: string; txHash?: string } & FormFields
-  | { kind: 'complete'; mode: Mode; estimatedZec: string } & FormFields
-  | { kind: 'error'; mode: Mode; reason: string; retryFields?: FormFields };
-
-export type SwapEvent =
-  | { type: 'choose_wallet' }
-  | { type: 'choose_manual' }
-  | { type: 'disconnect' }
-  | { type: 'select_token'; token: SourceToken }
-  | { type: 'set_amount'; amount: string }
-  | { type: 'set_zec_addr'; address: string }
-  | { type: 'set_refund_addr'; address: string }
-  | { type: 'set_slippage'; bps: number }
-  | { type: 'request_quote' }
-  | { type: 'quote_received'; depositAddress: string; estimatedZec: string }
-  | { type: 'quote_expired' }
-  | { type: 'confirm' }
-  | { type: 'tx_sent'; hash: string }
-  | { type: 'status_complete' }
-  | { type: 'status_failed'; reason: string }
-  | { type: 'retry' }
-  | { type: 'reset' }
-  | { type: 'restore'; depositAddress: string; estimatedZec: string; amount: string; zecAddress: string; token: SourceToken; txHash?: string; mode: Mode };
-
 export const CIPHERSCAN_API = 'https://api.mainnet.cipherscan.app';
 export const ZEC_ASSET_ID = 'nep141:zec.omft.near';
 export const ZEC_DECIMALS = 8;
-export const PENDING_SWAP_KEY = 'cipherswap_pending_swap';
 
 export const CHAIN_EXPLORERS: Record<string, string> = {
   eth: 'https://etherscan.io/tx/',
@@ -265,6 +209,43 @@ export function apiTokensToSourceTokens(apiTokens: any[]): SourceToken[] {
         decimals: t.decimals,
         assetId: t.assetId,
         contractAddress,
+        priceUsd: typeof t.price === 'number' && t.price > 0 ? t.price : undefined,
       };
     });
+}
+
+const EVM_ADDR = /^0x[a-fA-F0-9]{40}$/;
+const SOL_ADDR = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
+const TRON_ADDR = /^T[1-9A-HJ-NP-Za-km-z]{33}$/;
+const BTC_ADDR = /^(bc1[02-9ac-hj-np-z]{11,87}|[13][1-9A-HJ-NP-Za-km-z]{25,34})$/;
+const EVM_CHAIN_IDS = new Set(['eth', 'base', 'arb', 'op', 'pol', 'avax', 'bsc', 'gnosis', 'bera', 'scroll', 'monad', 'xlayer', 'plasma']);
+
+/** Format check only; NEAR Intents performs the authoritative validation. */
+export function validateRefundAddress(chain: string, addr: string): string | null {
+  if (!addr) return null;
+  if (EVM_CHAIN_IDS.has(chain)) return EVM_ADDR.test(addr) ? null : 'Expected a 0x… address';
+  if (chain === 'sol') return SOL_ADDR.test(addr) ? null : 'Expected a Solana address';
+  if (chain === 'tron') return TRON_ADDR.test(addr) ? null : 'Expected a Tron address (T…)';
+  if (chain === 'btc') return BTC_ADDR.test(addr) ? null : 'Expected a Bitcoin address';
+  return addr.trim().length >= 8 ? null : 'Address looks too short';
+}
+
+const NATIVE_SYMBOL: Record<string, string> = {
+  eth: 'ETH', base: 'ETH', arb: 'ETH', op: 'ETH', btc: 'BTC', sol: 'SOL', near: 'NEAR', tron: 'TRX',
+  doge: 'DOGE', ltc: 'LTC', bch: 'BCH', xrp: 'XRP', ton: 'TON', sui: 'SUI', bsc: 'BNB', pol: 'POL',
+  avax: 'AVAX', dash: 'DASH', cardano: 'ADA', gnosis: 'XDAI', bera: 'BERA', aleo: 'ALEO',
+};
+
+/** Best-effort token lookup for an asset ID when no local swap record exists. */
+export function resolveAsset(assetId: string, tokens: SourceToken[]): { symbol: string; chain: string; chainLabel: string } {
+  const hit = tokens.find((t) => t.assetId === assetId);
+  if (hit) return { symbol: hit.token, chain: hit.chain, chainLabel: hit.chainLabel };
+  const parts = assetId.split(':');
+  if (parts[0] === '1cs_v1' && parts[1]) {
+    const chain = parts[1];
+    return { symbol: NATIVE_SYMBOL[chain] ?? chain.toUpperCase(), chain, chainLabel: CHAIN_LABELS[chain] ?? chain };
+  }
+  const m = assetId.match(/^nep141:([a-z]+)[-.]/);
+  const chain = m?.[1] ?? 'near';
+  return { symbol: NATIVE_SYMBOL[chain] ?? '?', chain, chainLabel: CHAIN_LABELS[chain] ?? chain };
 }

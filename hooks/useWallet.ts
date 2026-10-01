@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { parseUnits, type Chain } from 'viem';
+import { formatUnits, parseUnits, type Chain } from 'viem';
 import { mainnet, base, arbitrum, polygon, optimism, avalanche, bsc } from 'viem/chains';
 
 type WalletType = 'evm' | 'solana' | 'bitcoin' | 'tron' | null;
@@ -30,7 +30,8 @@ interface WalletState {
 }
 
 export interface UseWalletReturn extends WalletState {
-  connect: (wallet: DetectedWallet) => Promise<void>;
+  /** Resolves true when connected, false when the user dismissed the prompt. */
+  connect: (wallet: DetectedWallet) => Promise<boolean>;
   disconnect: () => void;
   sendTransaction: (to: string, amount: string, decimals: number, contractAddress?: string) => Promise<string>;
   getNativeBalance: (evmChainKey?: string) => Promise<string | null>;
@@ -39,6 +40,7 @@ export interface UseWalletReturn extends WalletState {
   getWalletsForChain: (chainId: string) => DetectedWallet[];
   allWallets: DetectedWallet[];
   switching: boolean;
+  eagerConnectSolana: () => Promise<boolean>;
 }
 
 const EVM_CHAINS: Record<string, Chain> = {
@@ -290,8 +292,8 @@ export function useWallet(): UseWalletReturn {
     return allWallets.filter(w => w.type === wType);
   }, [allWallets]);
 
-  const connect = useCallback(async (wallet: DetectedWallet) => {
-    if (!wallet.type) return;
+  const connect = useCallback(async (wallet: DetectedWallet): Promise<boolean> => {
+    if (!wallet.type) return false;
     setSwitching(true);
     try {
       if (wallet.type === 'evm') {
@@ -367,6 +369,7 @@ export function useWallet(): UseWalletReturn {
           setState({ connected: true, address: resp?.address || resp?.addresses?.[0]?.address, walletType: 'bitcoin', walletName: match.name, chainId: null });
         }
       }
+      return true;
     } catch (err: any) {
       const msg = (err?.message || '').toLowerCase();
       const code = err?.code;
@@ -378,8 +381,34 @@ export function useWallet(): UseWalletReturn {
         console.error('Wallet connection failed:', err);
         throw err;
       }
+      return false;
     } finally {
       setSwitching(false);
+    }
+  }, []);
+
+  // Silent reconnect for a Solana wallet that already trusts this origin.
+  // Used for the exposure → encrypt handoff so the source wallet carries over
+  // without a second approval prompt. No-op if the wallet has not authorized us.
+  const eagerConnectSolana = useCallback(async (): Promise<boolean> => {
+    try {
+      const providers = getSolanaProviders();
+      const p = providers[0];
+      if (!p?.provider?.connect) return false;
+      const resp = await p.provider.connect({ onlyIfTrusted: true });
+      const pubKey = resp?.publicKey ?? p.provider.publicKey;
+      if (!pubKey) return false;
+      setRawProvider(p.provider);
+      setState({
+        connected: true,
+        address: pubKey.toString(),
+        walletType: 'solana',
+        walletName: p.name,
+        chainId: null,
+      });
+      return true;
+    } catch {
+      return false;
     }
   }, []);
 
@@ -421,7 +450,7 @@ export function useWallet(): UseWalletReturn {
         const mint = new PublicKey(contractAddress);
         const from = new PublicKey(state.address!);
         const toPubkey = new PublicKey(to);
-        const tokenAmount = BigInt(Math.round(parseFloat(amount) * Math.pow(10, decimals)));
+        const tokenAmount = parseUnits(amount, decimals);
 
         const sourceAta = await getAssociatedTokenAddress(mint, from);
         const destAta = await getAssociatedTokenAddress(mint, toPubkey, true);
@@ -435,7 +464,7 @@ export function useWallet(): UseWalletReturn {
         tx.add(createTransferInstruction(sourceAta, destAta, from, tokenAmount));
       } else {
         const { SystemProgram } = await import('@solana/web3.js');
-        const lamports = Math.round(parseFloat(amount) * Math.pow(10, decimals));
+        const lamports = parseUnits(amount, decimals);
         tx.add(SystemProgram.transfer({ fromPubkey: new PublicKey(state.address!), toPubkey: new PublicKey(to), lamports }));
       }
 
@@ -449,17 +478,22 @@ export function useWallet(): UseWalletReturn {
       const tw = rawProvider;
       if (contractAddress) {
         const contract = await tw.contract().at(contractAddress);
-        const tokenAmount = BigInt(Math.round(parseFloat(amount) * Math.pow(10, decimals)));
+        const tokenAmount = parseUnits(amount, decimals);
         const result = await contract.transfer(to, tokenAmount.toString()).send();
         return result;
       }
-      const sunAmount = Math.round(parseFloat(amount) * 1e6);
+      const sunAmount = Number(parseUnits(amount, 6));
       const tx = await tw.trx.sendTransaction(to, sunAmount);
-      return tx.txid || tx.transaction?.txID || '';
+      const txid = tx.txid || tx.transaction?.txID;
+      if (!txid) throw new Error('TronLink did not return a transaction id');
+      return txid;
     }
 
     if (state.walletType === 'bitcoin') {
-      const satoshis = Math.round(parseFloat(amount) * 1e8);
+      if (typeof rawProvider.sendBitcoin !== 'function') {
+        throw new Error(`${state.walletName ?? 'This wallet'} cannot send from CipherSwap. Use "Send manually" instead.`);
+      }
+      const satoshis = Number(parseUnits(amount, 8));
       return await rawProvider.sendBitcoin(to, satoshis);
     }
 
@@ -509,9 +543,7 @@ export function useWallet(): UseWalletReturn {
           method: 'eth_call',
           params: [{ to: contractAddress, data }, 'latest'],
         });
-        const raw = BigInt(hex);
-        const bal = (Number(raw) / Math.pow(10, decimals)).toFixed(6);
-        return bal;
+        return formatUnits(BigInt(hex), decimals);
       }
       if (state.walletType === 'solana') {
         const rpcRes = await fetch(getSolanaRpcUrl(), {
@@ -527,8 +559,7 @@ export function useWallet(): UseWalletReturn {
         const accounts = rpcData.result?.value || [];
         if (accounts.length > 0) {
           const info = accounts[0].account.data.parsed.info;
-          const bal = (Number(info.tokenAmount.amount) / Math.pow(10, info.tokenAmount.decimals)).toFixed(6);
-          return bal;
+          return formatUnits(BigInt(info.tokenAmount.amount), info.tokenAmount.decimals);
         }
         return '0';
       }
@@ -536,7 +567,7 @@ export function useWallet(): UseWalletReturn {
         const contract = await rawProvider.contract().at(contractAddress);
         const raw = await contract.balanceOf(state.address).call();
         const val = typeof raw === 'object' ? (raw._hex ? BigInt(raw._hex) : BigInt(raw.toString())) : BigInt(raw);
-        return (Number(val) / Math.pow(10, decimals)).toFixed(6);
+        return formatUnits(val, decimals);
       }
     } catch (err) {
       console.error('[wallet] Token balance fetch failed:', err);
@@ -550,9 +581,7 @@ export function useWallet(): UseWalletReturn {
       if (state.walletType === 'evm') {
         if (evmChainKey) await switchEvmChain(evmChainKey);
         const hex = await rawProvider.request({ method: 'eth_getBalance', params: [state.address, 'latest'] });
-        const wei = BigInt(hex);
-        const bal = (Number(wei) / 1e18).toFixed(6);
-        return bal;
+        return formatUnits(BigInt(hex), 18);
       }
       if (state.walletType === 'solana') {
         const rpcRes = await fetch(getSolanaRpcUrl(), {
@@ -562,19 +591,18 @@ export function useWallet(): UseWalletReturn {
         });
         const rpcData = await rpcRes.json();
         if (rpcData.result?.value != null) {
-          const bal = (rpcData.result.value / 1e9).toFixed(6);
-          return bal;
+          return formatUnits(BigInt(rpcData.result.value), 9);
         }
       }
       if (state.walletType === 'tron') {
         const bal = await rawProvider.trx.getBalance(state.address);
-        return (bal / 1e6).toFixed(6);
+        return formatUnits(BigInt(bal), 6);
       }
       if (state.walletType === 'bitcoin') {
         if (rawProvider.getBalance) {
           const result = await rawProvider.getBalance();
           const sats = typeof result === 'object' ? (result.total ?? result.confirmed ?? 0) : result;
-          return (Number(sats) / 1e8).toFixed(8);
+          return formatUnits(BigInt(sats), 8);
         }
         if (rawProvider.request) {
           try {
@@ -584,9 +612,11 @@ export function useWallet(): UseWalletReturn {
               const apiRes = await fetch(`https://mempool.space/api/address/${addr}`);
               const data = await apiRes.json();
               const sats = (data?.chain_stats?.funded_txo_sum ?? 0) - (data?.chain_stats?.spent_txo_sum ?? 0);
-              return (sats / 1e8).toFixed(8);
+              return formatUnits(BigInt(sats), 8);
             }
-          } catch { /* Leather balance fetch failed */ }
+          } catch (err) {
+            console.error('[wallet] Leather balance fetch failed:', err);
+          }
         }
       }
     } catch (err) {
@@ -606,5 +636,6 @@ export function useWallet(): UseWalletReturn {
     getWalletsForChain,
     allWallets,
     switching,
+    eagerConnectSolana,
   };
 }

@@ -1,436 +1,296 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useWallet, chainToWalletType, type DetectedWallet } from '@/hooks/useWallet';
 import { useSwapMachine } from '@/hooks/useSwapMachine';
 import { useTokenList } from '@/hooks/useTokenList';
 import { useBalance } from '@/hooks/useBalance';
-import { useQuoteCountdown } from '@/hooks/useQuoteCountdown';
-import { useStatusPolling } from '@/hooks/useStatusPolling';
-import { usePendingSwapRestore, usePendingSwapPersist } from '@/hooks/usePendingSwap';
 import { useRecommendations } from '@/hooks/useRecommendations';
+import { useQuotePreview } from '@/hooks/useQuotePreview';
 import { useMoonPay } from '@/hooks/useMoonPay';
 import { supportsMoonPayBuy } from '@/lib/moonpay';
-import { SectionLabel } from './SectionLabel';
-import { WalletSwitcher } from './WalletSwitcher';
-import { Sidebar } from './Sidebar';
-import { Connect } from './steps/Connect';
-import { Form } from './steps/Form';
-import { Quote } from './steps/Quote';
-import { Waiting } from './steps/Waiting';
-import { Complete } from './steps/Complete';
-import { Error as ErrorStep } from './steps/Error';
+import { toSmallestUnit } from '@/lib/amount';
+import { humanizeQuoteError, humanizeWalletError, isUserRejection } from '@/lib/errors';
+import { shortAddress } from '@/lib/deposit';
+import type { QuoteResponse } from '@/lib/near-intents';
+import { appendLog, removeSwap, saveSwap, setLastWallet, updateSwap } from '@/lib/swap-history';
+import { WalletButton, WalletModal } from './WalletModal';
+import { EditView, type SendMode } from './steps/EditView';
+import { ReviewView } from './steps/ReviewView';
+import { RecentSwaps } from './RecentSwaps';
 import type { SourceToken } from './types';
-import { PENDING_SWAP_KEY, ZEC_ASSET_ID, ZEC_DECIMALS, validateZecAddress } from './types';
+import { ZEC_ASSET_ID } from './types';
 
-const motionProps = {
-  initial: { opacity: 0, x: 20 },
-  animate: { opacity: 1, x: 0 },
-  exit: { opacity: 0, x: -20 },
-  transition: { type: 'spring' as const, stiffness: 300, damping: 30 },
+const EDIT_REFRESH_MS = 30_000;
+const REVIEW_REFRESH_MS = 15_000;
+/** A binding quote is reused on wallet retry only while this fresh. */
+const BINDING_TTL_MS = 90_000;
+/** Binding output more than 0.5% below the preview requires explicit acceptance. */
+const RATE_TOLERANCE_PER_MILLE = 5;
+
+const fade = {
+  initial: { opacity: 0, y: 4 },
+  animate: { opacity: 1, y: 0 },
+  exit: { opacity: 0, y: -4 },
+  transition: { duration: 0.15 },
 };
 
-interface SwapClientProps {
-  initialTokens?: SourceToken[];
-}
-
-export default function SwapClient({ initialTokens }: SwapClientProps) {
-  const [state, dispatch] = useSwapMachine();
+export default function SwapClient({ initialTokens }: { initialTokens?: SourceToken[] }) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const wallet = useWallet();
   const { tokens, loading: tokensLoading } = useTokenList(initialTokens);
+  const [state, dispatch] = useSwapMachine(initialTokens?.[0]);
+  const [walletModal, setWalletModal] = useState(false);
   const [walletError, setWalletError] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [sendingTx, setSendingTx] = useState(false);
-  const [txWalletError, setTxWalletError] = useState('');
-  const [showSlippage, setShowSlippage] = useState(false);
-  const [previewZec, setPreviewZec] = useState('');
-  const [previewLoading, setPreviewLoading] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
   const [balanceRefresh, setBalanceRefresh] = useState(0);
-  const previewTimer = useRef<NodeJS.Timeout | null>(null);
-  const previewRequestId = useRef(0);
+  const amountRef = useRef<HTMLInputElement>(null);
+  const handoffDone = useRef(false);
 
-  const selectedToken = (state.kind !== 'connect' && state.kind !== 'error')
-    ? state.selectedToken
-    : (state.kind === 'error' && state.retryFields ? state.retryFields.selectedToken : (initialTokens?.[0] || tokens[0]));
-  const { balance, loading: balanceLoading } = useBalance(wallet, selectedToken, balanceRefresh);
-  const recommendations = useRecommendations(selectedToken);
+  const t = state.selectedToken;
+  const compatible = wallet.connected && chainToWalletType(t.chain) === wallet.walletType;
+  const sendMode: SendMode = state.manual ? 'manual' : compatible ? 'wallet' : 'choose';
+  const refundAddress = sendMode === 'wallet' ? wallet.address ?? '' : state.refundAddress;
+
+  const { balance, loading: balanceLoading } = useBalance({ ...wallet, connected: compatible }, t, balanceRefresh);
+  const recommendations = useRecommendations(t);
   const moonPay = useMoonPay();
+  const reviewing = state.view !== 'edit';
+  const refreshMs = reviewing ? REVIEW_REFRESH_MS : EDIT_REFRESH_MS;
+  const preview = useQuotePreview({ token: t, amount: state.amount, slippageBps: state.slippageBps, refreshMs });
 
-  usePendingSwapRestore(dispatch, state);
-  usePendingSwapPersist(state);
-
-  const chainWallets = wallet.getWalletsForChain(selectedToken.chain);
-
-  const compatibleTokens = wallet.connected && state.kind !== 'connect' && state.mode === 'wallet'
-    ? tokens.filter(t => chainToWalletType(t.chain) === wallet.walletType)
-    : tokens;
-
-  // Auto-set initial token when tokens load
+  // Handoff from the exposure audit: ?from=solana reconnects a Solana wallet
+  // that already trusts this origin and preselects SOL; ?from=bitcoin|ethereum preselects BTC/ETH.
   useEffect(() => {
-    if (state.kind === 'form' && tokens.length > 0 && state.selectedToken.id === 'eth-usdc') {
-      const compatible = state.mode === 'wallet' && wallet.connected
-        ? tokens.filter(t => chainToWalletType(t.chain) === wallet.walletType)
-        : tokens;
-      if (compatible.length > 0 && compatible[0].id !== state.selectedToken.id) {
-        dispatch({ type: 'select_token', token: compatible[0] });
-      }
-    }
-  }, [tokens, wallet.connected, wallet.walletType]);
-
-  // Wallet connection → refund auto-fill + token realignment
-  useEffect(() => {
-    if (wallet.connected && wallet.address && state.kind !== 'connect' && state.mode === 'wallet') {
-      dispatch({ type: 'set_refund_addr', address: wallet.address });
-      if (chainToWalletType(selectedToken.chain) !== wallet.walletType) {
-        const firstCompatible = tokens.find(t => chainToWalletType(t.chain) === wallet.walletType);
-        if (firstCompatible) dispatch({ type: 'select_token', token: firstCompatible });
-      }
-    }
-  }, [wallet.connected, wallet.address, wallet.walletType]);
-
-  // Quote countdown
-  const expiresAt = state.kind === 'quote' ? state.expiresAt : null;
-  const { timeLeft, progress } = useQuoteCountdown(expiresAt, () => {
-    dispatch({ type: 'quote_expired' });
-    setError('Quote expired — please get a new one');
-  });
-
-  // Status polling
-  const depositAddr = (state.kind === 'waiting') ? state.depositAddress : null;
-  const swapStatus = useStatusPolling(
-    depositAddr,
-    state.kind === 'waiting',
-    () => {
-      dispatch({ type: 'status_complete' });
-      localStorage.removeItem(PENDING_SWAP_KEY);
-    },
-    (reason) => {
-      dispatch({ type: 'status_failed', reason });
-      localStorage.removeItem(PENDING_SWAP_KEY);
-    },
-  );
-
-  // Live ZEC preview (debounced dry quote)
-  useEffect(() => {
-    if (state.kind !== 'form' && state.kind !== 'quoting') return;
-
-    const amt = state.amount;
-    if (!amt || parseFloat(amt) <= 0) {
-      setPreviewZec('');
-      setPreviewLoading(false);
+    if (handoffDone.current) return;
+    const from = searchParams.get('from');
+    if (from === 'bitcoin' || from === 'btc') {
+      handoffDone.current = true;
+      const btc = tokens.find((x) => x.chain === 'btc');
+      if (btc) dispatch({ type: 'select_token', token: btc });
       return;
     }
+    if (from === 'ethereum' || from === 'eth') {
+      handoffDone.current = true;
+      const eth = tokens.find((x) => x.chain === 'eth' && x.token === 'ETH');
+      if (eth) dispatch({ type: 'select_token', token: eth });
+      return;
+    }
+    if (from !== 'solana' && from !== 'sol') return;
+    handoffDone.current = true;
+    (async () => {
+      const connected = await wallet.eagerConnectSolana();
+      if (!connected) return;
+      const sol = tokens.find((x) => x.chain === 'sol');
+      if (sol) dispatch({ type: 'select_token', token: sol });
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
-    setPreviewLoading(true);
-    if (previewTimer.current) clearTimeout(previewTimer.current);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const el = e.target as HTMLElement;
+      const typing = el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable;
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        if (state.view !== 'edit') return;
+        e.preventDefault();
+        setPickerOpen(true);
+      } else if (e.key === '/' && !typing && state.view === 'edit') {
+        e.preventDefault();
+        amountRef.current?.focus();
+      } else if (e.key === 'Escape' && state.view === 'review') {
+        dispatch({ type: 'back' });
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [state.view, dispatch]);
 
-    const requestId = ++previewRequestId.current;
-    previewTimer.current = setTimeout(async () => {
+  const handleConnect = async (w: DetectedWallet) => {
+    setWalletError('');
+    try {
+      const ok = await wallet.connect(w);
+      if (!ok) return;
+      setLastWallet(w.name);
+      setWalletModal(false);
+      dispatch({ type: 'set_manual', manual: false });
+      if (chainToWalletType(t.chain) !== w.type) {
+        const match = tokens.find((x) => chainToWalletType(x.chain) === w.type);
+        if (match) dispatch({ type: 'select_token', token: match });
+      }
+    } catch (err) {
+      setWalletError(humanizeWalletError(err, w.name));
+    }
+  };
+
+  const handleConfirm = async () => {
+    if (!preview.data) return;
+    const amount = toSmallestUnit(state.amount, t.decimals);
+    if (!amount) return;
+
+    let binding: QuoteResponse | null =
+      state.binding && Date.now() - state.binding.receivedAt < BINDING_TTL_MS ? state.binding.response : null;
+
+    if (!binding) {
+      dispatch({ type: 'lock' });
       try {
-        const amountSmallest = BigInt(
-          Math.round(parseFloat(amt) * Math.pow(10, state.selectedToken.decimals)),
-        ).toString();
         const res = await fetch('/api/swap/quote', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            originAsset: state.selectedToken.assetId,
+            originAsset: t.assetId,
             destinationAsset: ZEC_ASSET_ID,
-            amount: amountSmallest,
-            recipient: 't1VpYeCSNCDMM91x3KR1N8bBWQNnqiUpvy4',
-            refundTo: '0x0000000000000000000000000000000000000000',
+            amount: amount.toString(),
+            recipient: state.zecAddress,
+            refundTo: refundAddress,
             slippageBps: state.slippageBps,
-            dry: true,
           }),
         });
-        const data = await res.json();
-        if (requestId !== previewRequestId.current) return;
-        if (data.success) {
-          const q = data.quote || data;
-          const out = q.amountOut || q.estimatedAmountOut || data.amountOut;
-          if (out) {
-            setPreviewZec((parseInt(out) / Math.pow(10, ZEC_DECIMALS)).toFixed(4));
-          }
+        const json = await res.json();
+        if (!json.success || !json.quote?.depositAddress) {
+          throw new Error(humanizeQuoteError(json.error || 'No deposit address returned', { symbol: t.token, decimals: t.decimals }));
         }
-      } catch {
-        /* keep previous preview on error */
-      } finally {
-        if (requestId === previewRequestId.current) {
-          setPreviewLoading(false);
-        }
+        binding = json as QuoteResponse;
+      } catch (err) {
+        dispatch({ type: 'fail', error: err instanceof Error ? err.message : 'Could not lock a quote' });
+        return;
       }
-    }, 500);
-
-    return () => {
-      if (previewTimer.current) clearTimeout(previewTimer.current);
-    };
-  }, [
-    state.kind,
-    state.kind === 'form' || state.kind === 'quoting' ? state.amount : '',
-    state.kind === 'form' || state.kind === 'quoting' ? state.selectedToken.id : '',
-    state.kind === 'form' || state.kind === 'quoting' ? state.slippageBps : 0,
-  ]);
-
-  const handleChooseWallet = async (w: DetectedWallet) => {
-    setWalletError('');
-    try {
-      await wallet.connect(w);
-      dispatch({ type: 'choose_wallet' });
-    } catch (err: any) {
-      setWalletError(err.message || 'Connection failed');
+      const previewOut = BigInt(preview.data.quote.amountOut);
+      const lockedOut = BigInt(binding.quote.amountOut);
+      const worse = lockedOut * BigInt(1000) < previewOut * BigInt(1000 - RATE_TOLERANCE_PER_MILLE);
+      dispatch({ type: 'locked', response: binding, rateChanged: worse });
+      if (worse) return;
     }
-  };
 
-  const handleGetQuote = async () => {
-    if (state.kind !== 'form') return;
-    const addrErr = validateZecAddress(state.zecAddress);
-    if (!state.amount || !state.zecAddress || addrErr) return;
+    const depositAddress = binding.quote.depositAddress!;
+    const depositMemo = binding.quote.depositMemo;
+    const viaWallet = sendMode === 'wallet' && !depositMemo;
 
-    const effectiveRefund = state.refundAddress || wallet.address || '';
-    if (!effectiveRefund) return;
+    saveSwap({
+      depositAddress,
+      depositMemo,
+      createdAt: Date.now(),
+      mode: viaWallet ? 'wallet' : 'manual',
+      token: t.token,
+      chain: t.chain,
+      chainLabel: t.chainLabel,
+      assetId: t.assetId,
+      decimals: t.decimals,
+      contractAddress: t.contractAddress,
+      amount: state.amount,
+      zecAddress: state.zecAddress,
+      refundAddress,
+      estimatedZec: binding.quote.amountOutFormatted,
+      quoteResponse: binding,
+      log: [{ at: Date.parse(binding.timestamp) || Date.now(), code: 'quote_signed', detail: shortAddress(depositAddress, 8, 6) }],
+    });
 
-    setLoading(true);
-    setError('');
-    dispatch({ type: 'request_quote' });
-
-    try {
-      const amountSmallest = BigInt(Math.round(parseFloat(state.amount) * Math.pow(10, state.selectedToken.decimals))).toString();
-      const res = await fetch('/api/swap/quote', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          originAsset: state.selectedToken.assetId,
-          destinationAsset: ZEC_ASSET_ID,
-          amount: amountSmallest,
-          recipient: state.zecAddress,
-          refundTo: effectiveRefund,
-          slippageBps: state.slippageBps,
-        }),
-      });
-      const data = await res.json();
-      if (!data.success) throw new Error(data.error || 'Failed to get quote');
-      const q = data.quote || data;
-      const depositAddress = q.depositAddress || data.depositAddress || '';
-      const outAmount = q.amountOut || q.estimatedAmountOut || data.amountOut;
-      const estimatedZec = outAmount ? (parseInt(outAmount) / Math.pow(10, ZEC_DECIMALS)).toFixed(4) : '';
-
-      dispatch({ type: 'quote_received', depositAddress, estimatedZec });
-    } catch (err: any) {
-      setError(err.message || 'Failed to get quote');
-      dispatch({ type: 'quote_expired' });
-    } finally {
-      setLoading(false);
+    if (viaWallet) {
+      dispatch({ type: 'signing' });
+      try {
+        const hash = await wallet.sendTransaction(depositAddress, state.amount, t.decimals, t.contractAddress);
+        updateSwap(depositAddress, { txHash: hash });
+        appendLog(depositAddress, { at: Date.now(), code: 'deposit_broadcast', detail: shortAddress(hash, 8, 6) });
+        setBalanceRefresh((n) => n + 1);
+      } catch (err) {
+        if (isUserRejection(err)) removeSwap(depositAddress);
+        dispatch({ type: 'fail', error: humanizeWalletError(err, wallet.walletName, t.token) });
+        return;
+      }
     }
+
+    const qs = depositMemo ? `?memo=${encodeURIComponent(depositMemo)}` : '';
+    router.push(`/swap/${encodeURIComponent(depositAddress)}${qs}`);
   };
 
-  const handleSendFromWallet = async () => {
-    if (state.kind !== 'waiting') return;
-    setSendingTx(true);
-    setTxWalletError('');
-    try {
-      const hash = await wallet.sendTransaction(state.depositAddress, state.amount, state.selectedToken.decimals, state.selectedToken.contractAddress);
-      dispatch({ type: 'tx_sent', hash });
-    } catch (err: any) {
-      setTxWalletError(err.message || 'Transaction rejected');
-    } finally {
-      setSendingTx(false);
-    }
-  };
-
-  const handleReset = () => {
-    dispatch({ type: 'reset' });
-    setError('');
-    setTxWalletError('');
-    setPreviewZec('');
-    setPreviewLoading(false);
-    setBalanceRefresh(n => n + 1);
-    localStorage.removeItem(PENDING_SWAP_KEY);
-  };
-
-  const openMoonPayWidget = useCallback(() => {
+  const openMoonPay = useCallback(() => {
     if (!wallet.address) return;
     moonPay.clearError();
-    moonPay.openBuyWidget({
-      walletAddress: wallet.address,
-      selectedToken,
-      onCompleted: () => setBalanceRefresh(n => n + 1),
-    });
-  }, [wallet.address, selectedToken, moonPay]);
+    moonPay.openBuyWidget({ walletAddress: wallet.address, selectedToken: t, onCompleted: () => setBalanceRefresh((n) => n + 1) });
+  }, [wallet.address, t, moonPay]);
 
-  const currentAmount = (state.kind !== 'connect' && state.kind !== 'error') ? state.amount : '';
-  const insufficientBalance = !!(wallet.connected && balance && currentAmount && parseFloat(currentAmount) > parseFloat(balance));
-  const showBuyWithCard = !!(
-    moonPay.isConfigured
-    && state.kind === 'form'
-    && state.mode === 'wallet'
-    && wallet.connected
-    && wallet.address
-    && supportsMoonPayBuy(selectedToken.chain, wallet.walletType)
-  );
+  const showCard = !!(moonPay.isConfigured && sendMode === 'wallet' && wallet.address && supportsMoonPayBuy(t.chain, wallet.walletType));
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 animate-fade-in-up">
-      {/* Main Swap Card */}
-      <div className="lg:col-span-3">
-        <div className="card card-static p-0 overflow-hidden">
-          {/* Card header */}
-          <div className="px-5 py-3.5 border-b border-glass-4">
-            <div className="flex items-center justify-between">
-              <SectionLabel label="SWAP" />
-              {state.kind !== 'connect' && state.mode === 'wallet' && (
-                <WalletSwitcher
-                  wallet={wallet}
-                  chainWallets={chainWallets}
-                  selectedChainLabel={selectedToken.chainLabel}
-                  onConnect={async (w) => {
-                    setWalletError('');
-                    try { await wallet.connect(w); } catch (err: any) { setWalletError(err.message || 'Failed'); }
-                  }}
-                  onDisconnect={() => {
-                    wallet.disconnect();
-                    handleReset();
-                  }}
-                />
-              )}
-              {state.kind !== 'connect' && state.mode === 'manual' && (
-                <span className="text-[10px] font-mono text-muted/60 uppercase tracking-wider">Manual mode</span>
-              )}
-            </div>
-          </div>
+    <div className="w-full max-w-[480px] mx-auto space-y-3">
+      <RecentSwaps />
 
-          <div className="p-4 sm:p-5">
-            <AnimatePresence mode="wait">
-              {state.kind === 'connect' && (
-                <motion.div key="connect" {...motionProps}>
-                  <Connect
-                    wallet={wallet}
-                    onChooseWallet={handleChooseWallet}
-                    onChooseManual={() => dispatch({ type: 'choose_manual' })}
-                    walletError={walletError}
-                  />
-                </motion.div>
-              )}
+      <div className="swap-card p-2 sm:p-2.5">
+        <div className="flex items-center justify-between px-2.5 pt-1.5 pb-2.5">
+          <h2 className="eyebrow">{reviewing ? 'review swap' : 'swap to zec'}</h2>
+          <WalletButton
+            wallet={wallet}
+            onOpen={() => { setWalletError(''); setWalletModal(true); }}
+            onDisconnect={() => { wallet.disconnect(); dispatch({ type: 'set_refund_addr', address: '' }); }}
+          />
+        </div>
 
-              {(state.kind === 'form' || state.kind === 'quoting') && (
-                <motion.div key="form" {...motionProps}>
-                  <Form
-                    mode={state.mode}
-                    amount={state.amount}
-                    zecAddress={state.zecAddress}
-                    refundAddress={state.refundAddress}
-                    slippageBps={state.slippageBps}
-                    selectedToken={state.selectedToken}
-                    tokens={compatibleTokens}
-                    tokensLoading={tokensLoading}
-                    balance={balance}
-                    balanceLoading={balanceLoading}
-                    previewZec={previewZec}
-                    previewLoading={previewLoading}
-                    loading={loading || state.kind === 'quoting'}
-                    error={error}
-                    walletAddress={wallet.address}
-                    insufficientBalance={insufficientBalance}
-                    onSelectToken={(t) => dispatch({ type: 'select_token', token: t })}
-                    onSetAmount={(v) => dispatch({ type: 'set_amount', amount: v })}
-                    onSetZecAddr={(v) => dispatch({ type: 'set_zec_addr', address: v })}
-                    onSetRefundAddr={(v) => dispatch({ type: 'set_refund_addr', address: v })}
-                    onSetSlippage={(v) => dispatch({ type: 'set_slippage', bps: v })}
-                    onSubmit={handleGetQuote}
-                    onGoConnect={handleReset}
-                    showSlippage={showSlippage}
-                    onToggleSlippage={() => setShowSlippage(!showSlippage)}
-                    showBuyWithCard={showBuyWithCard}
-                    onBuyWithCard={openMoonPayWidget}
-                    buyWithCardLoading={moonPay.loading}
-                    buyWithCardError={moonPay.error}
-                  />
-                </motion.div>
-              )}
+        <AnimatePresence mode="wait" initial={false}>
+          {state.view === 'edit' ? (
+            <motion.div key="edit" {...fade}>
+              <EditView
+                state={state}
+                amountRef={amountRef}
+                tokens={tokens}
+                tokensLoading={tokensLoading}
+                pickerOpen={pickerOpen}
+                onPickerOpenChange={setPickerOpen}
+                sendMode={sendMode}
+                walletConnected={wallet.connected}
+                walletName={wallet.walletName}
+                balance={compatible ? balance : null}
+                balanceLoading={compatible && balanceLoading}
+                preview={preview}
+                recommendations={recommendations}
+                onSelectToken={(token) => dispatch({ type: 'select_token', token })}
+                onSetAmount={(amount) => dispatch({ type: 'set_amount', amount })}
+                onSetZecAddr={(address) => dispatch({ type: 'set_zec_addr', address })}
+                onSetRefundAddr={(address) => dispatch({ type: 'set_refund_addr', address })}
+                onSetSlippage={(bps) => dispatch({ type: 'set_slippage', bps })}
+                onOpenWallet={() => { setWalletError(''); setWalletModal(true); }}
+                onChooseManual={() => { setWalletModal(false); dispatch({ type: 'set_manual', manual: true }); }}
+                onUseWallet={() => { dispatch({ type: 'set_manual', manual: false }); if (!compatible) setWalletModal(true); }}
+                onReview={() => dispatch({ type: 'review' })}
+                buyWithCard={{ show: showCard, loading: moonPay.loading, error: moonPay.error, onOpen: openMoonPay }}
+              />
+            </motion.div>
+          ) : (
+            <motion.div key="review" {...fade}>
+              <ReviewView
+                state={state}
+                preview={preview}
+                refreshMs={refreshMs}
+                mode={sendMode === 'wallet' ? 'wallet' : 'manual'}
+                walletName={wallet.walletName}
+                refundAddress={refundAddress}
+                onBack={() => dispatch({ type: 'back' })}
+                onConfirm={handleConfirm}
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-              {state.kind === 'quote' && (
-                <motion.div key="quote" {...motionProps}>
-                  <Quote
-                    mode={state.mode}
-                    amount={state.amount}
-                    selectedToken={state.selectedToken}
-                    estimatedZec={state.estimatedZec}
-                    slippageBps={state.slippageBps}
-                    zecAddress={state.zecAddress}
-                    timeLeft={timeLeft}
-                    progress={progress}
-                    onBack={() => dispatch({ type: 'quote_expired' })}
-                    onConfirm={() => dispatch({ type: 'confirm' })}
-                    walletName={wallet.walletName}
-                  />
-                </motion.div>
-              )}
-
-              {state.kind === 'waiting' && (
-                <motion.div key="waiting" {...motionProps}>
-                  <Waiting
-                    mode={state.mode}
-                    amount={state.amount}
-                    selectedToken={state.selectedToken}
-                    estimatedZec={state.estimatedZec}
-                    depositAddress={state.depositAddress}
-                    txHash={state.txHash}
-                    swapStatus={swapStatus}
-                    sendingTx={sendingTx}
-                    walletError={txWalletError}
-                    onSendFromWallet={handleSendFromWallet}
-                    onCancel={handleReset}
-                  />
-                </motion.div>
-              )}
-
-              {state.kind === 'complete' && (
-                <motion.div key="complete" {...motionProps}>
-                  <Complete
-                    estimatedZec={state.estimatedZec}
-                    onReset={handleReset}
-                  />
-                </motion.div>
-              )}
-
-              {state.kind === 'error' && (
-                <motion.div key="error" {...motionProps}>
-                  <ErrorStep
-                    reason={state.reason}
-                    hasRetry={!!state.retryFields}
-                    refundAddress={state.retryFields?.refundAddress || wallet.address || undefined}
-                    onRetry={() => dispatch({ type: 'retry' })}
-                    onReset={handleReset}
-                  />
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
+        <div className="mt-2.5 px-2.5 pb-1 text-right">
+          <Link href="/how-it-works#privacy" className="text-xs text-muted hover:text-primary transition-colors">
+            What we know about you →
+          </Link>
         </div>
       </div>
 
-      {/* Sidebar — above swap on mobile during form for privacy tips */}
-      <div
-        className={`lg:col-span-2 ${
-          state.kind === 'form' || state.kind === 'quoting' ? 'order-first lg:order-none' : ''
-        }`}
-      >
-        <Sidebar
-          state={state}
-          recommendations={
-            state.kind === 'form' || state.kind === 'quoting' ? recommendations : null
-          }
-          currentAmount={
-            state.kind === 'form' || state.kind === 'quoting' ? state.amount : undefined
-          }
-          onSelectAmount={
-            state.kind === 'form' || state.kind === 'quoting'
-              ? (v) => dispatch({ type: 'set_amount', amount: v })
-              : undefined
-          }
-        />
-      </div>
+      <WalletModal
+        open={walletModal}
+        onClose={() => setWalletModal(false)}
+        wallet={wallet}
+        chain={t.chain}
+        chainLabel={t.chainLabel}
+        onConnect={handleConnect}
+        onChooseManual={() => { setWalletModal(false); dispatch({ type: 'set_manual', manual: true }); }}
+        error={walletError}
+      />
     </div>
   );
 }

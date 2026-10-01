@@ -1,142 +1,108 @@
 'use client';
 
 import { useReducer } from 'react';
-import type { SwapState, SwapEvent, FormFields } from '@/app/_components/types';
+import type { Draft, SourceToken } from '@/app/_components/types';
 import { FALLBACK_TOKENS } from '@/app/_components/types';
-import type { SourceToken } from '@/app/_components/types';
+import type { QuoteResponse } from '@/lib/near-intents';
 
-const DEFAULT_FORM: FormFields = {
-  amount: '',
-  zecAddress: '',
-  refundAddress: '',
-  slippageBps: 100,
-  selectedToken: FALLBACK_TOKENS[0],
-};
+/**
+ * edit    → the swap form (always the entry point; no connect gate)
+ * review  → indicative quote kept fresh; user checks addresses + numbers
+ * locking → requesting the binding quote that creates the deposit address
+ * signing → wallet prompt is open for the deposit transaction
+ */
+export type SwapView = 'edit' | 'review' | 'locking' | 'signing';
 
-function formFields(s: SwapState): FormFields {
-  if (s.kind === 'connect') return DEFAULT_FORM;
-  if (s.kind === 'error') return s.retryFields || DEFAULT_FORM;
+export interface SwapState extends Draft {
+  view: SwapView;
+  /** User opted to send from an exchange or external wallet. */
+  manual: boolean;
+  /** Binding quote reused if the user retries the wallet prompt. */
+  binding: { response: QuoteResponse; receivedAt: number } | null;
+  error: string | null;
+  /** Set when the binding quote came back materially worse than the preview. */
+  rateChanged: boolean;
+}
+
+export type SwapEvent =
+  | { type: 'select_token'; token: SourceToken }
+  | { type: 'set_amount'; amount: string }
+  | { type: 'set_zec_addr'; address: string }
+  | { type: 'set_refund_addr'; address: string }
+  | { type: 'set_slippage'; bps: number }
+  | { type: 'set_manual'; manual: boolean }
+  | { type: 'review' }
+  | { type: 'back' }
+  | { type: 'lock' }
+  | { type: 'locked'; response: QuoteResponse; rateChanged: boolean }
+  | { type: 'signing' }
+  | { type: 'fail'; error: string }
+  | { type: 'clear_error' }
+  | { type: 'reset' };
+
+function initial(token?: SourceToken): SwapState {
   return {
-    amount: s.amount,
-    zecAddress: s.zecAddress,
-    refundAddress: s.refundAddress,
-    slippageBps: s.slippageBps,
-    selectedToken: s.selectedToken,
+    view: 'edit',
+    manual: false,
+    binding: null,
+    error: null,
+    rateChanged: false,
+    amount: '',
+    zecAddress: '',
+    refundAddress: '',
+    slippageBps: 100,
+    selectedToken: token ?? FALLBACK_TOKENS[0],
   };
+}
+
+/** Any change to what is being swapped invalidates a binding quote. */
+function edited(state: SwapState, patch: Partial<SwapState>): SwapState {
+  return { ...state, ...patch, binding: null, rateChanged: false, error: null, view: 'edit' };
 }
 
 function swapReducer(state: SwapState, event: SwapEvent): SwapState {
   switch (event.type) {
-    case 'choose_wallet':
-      return { kind: 'form', mode: 'wallet', ...DEFAULT_FORM };
-
-    case 'choose_manual':
-      return { kind: 'form', mode: 'manual', ...DEFAULT_FORM };
-
-    case 'disconnect':
-      return { kind: 'connect' };
-
     case 'select_token':
-      if (state.kind === 'connect') return state;
-      return { ...state, kind: 'form', selectedToken: event.token, amount: '' } as any;
-
+      if (event.token.id === state.selectedToken.id) return state;
+      return edited(state, { selectedToken: event.token, amount: '', refundAddress: '' });
     case 'set_amount':
-      if (state.kind === 'connect') return state;
-      return { ...state, amount: event.amount } as any;
-
+      return edited(state, { amount: event.amount });
     case 'set_zec_addr':
-      if (state.kind === 'connect') return state;
-      return { ...state, zecAddress: event.address } as any;
-
+      return edited(state, { zecAddress: event.address.trim() });
     case 'set_refund_addr':
-      if (state.kind === 'connect') return state;
-      return { ...state, refundAddress: event.address } as any;
-
+      return edited(state, { refundAddress: event.address.trim() });
     case 'set_slippage':
-      if (state.kind === 'connect') return state;
-      return { ...state, slippageBps: event.bps } as any;
-
-    case 'request_quote':
-      if (state.kind !== 'form') return state;
-      return { ...state, kind: 'quoting' } as any;
-
-    case 'quote_received':
-      if (state.kind !== 'quoting') return state;
+      return { ...state, slippageBps: event.bps, binding: null, rateChanged: false };
+    case 'set_manual':
+      return { ...state, manual: event.manual, error: null };
+    case 'review':
+      return { ...state, view: 'review', error: null };
+    case 'back':
+      return { ...state, view: 'edit', error: null, rateChanged: false };
+    case 'lock':
+      return { ...state, view: 'locking', error: null };
+    case 'locked':
       return {
         ...state,
-        kind: 'quote',
-        depositAddress: event.depositAddress,
-        estimatedZec: event.estimatedZec,
-        expiresAt: Date.now() + 60_000,
-      } as any;
-
-    case 'quote_expired':
-      if (state.kind !== 'quote' && state.kind !== 'quoting') return state;
-      return { ...state, kind: 'form' } as any;
-
-    case 'confirm':
-      if (state.kind !== 'quote') return state;
-      return {
-        kind: 'waiting',
-        mode: state.mode,
-        depositAddress: state.depositAddress,
-        estimatedZec: state.estimatedZec,
-        ...formFields(state),
+        view: event.rateChanged ? 'review' : 'locking',
+        binding: { response: event.response, receivedAt: Date.now() },
+        rateChanged: event.rateChanged,
       };
-
-    case 'tx_sent':
-      if (state.kind !== 'waiting') return state;
-      return { ...state, txHash: event.hash } as any;
-
-    case 'status_complete':
-      if (state.kind !== 'waiting') return state;
-      return {
-        kind: 'complete',
-        mode: state.mode,
-        estimatedZec: state.estimatedZec,
-        ...formFields(state),
-      };
-
-    case 'status_failed':
-      if (state.kind !== 'waiting' && state.kind !== 'quoting') return state;
-      return {
-        kind: 'error',
-        mode: (state as any).mode || 'manual',
-        reason: event.reason,
-        retryFields: formFields(state),
-      } as any;
-
-    case 'retry': {
-      if (state.kind !== 'error') return state;
-      const fields = state.retryFields || DEFAULT_FORM;
-      return { kind: 'form', mode: state.mode, ...fields };
-    }
-
+    case 'signing':
+      return { ...state, view: 'signing', error: null };
+    case 'fail':
+      return { ...state, view: 'review', error: event.error };
+    case 'clear_error':
+      return { ...state, error: null };
     case 'reset':
-      return { kind: 'connect' };
-
-    case 'restore':
-      return {
-        kind: 'waiting',
-        mode: event.mode,
-        depositAddress: event.depositAddress,
-        estimatedZec: event.estimatedZec,
-        amount: event.amount,
-        zecAddress: event.zecAddress,
-        refundAddress: '',
-        slippageBps: 100,
-        selectedToken: event.token,
-        txHash: event.txHash,
-      };
-
+      return initial(state.selectedToken);
     default:
       return state;
   }
 }
 
 export function useSwapMachine(initialToken?: SourceToken) {
-  const initial: SwapState = { kind: 'connect' };
-  return useReducer(swapReducer, initial);
+  return useReducer(swapReducer, initialToken, initial);
 }
 
 export { swapReducer };

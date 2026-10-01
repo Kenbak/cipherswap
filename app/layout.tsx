@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
 import { Navbar } from "@/components/Navbar";
@@ -20,17 +20,10 @@ const geistMono = localFont({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "https://cipherswap.app"),
   title: "CipherSwap — Buy ZEC from any chain",
   description: "Swap any crypto to Zcash (ZEC) from 15+ blockchains. Non-custodial, no KYC, powered by NEAR Intents.",
   keywords: ["Zcash", "ZEC", "swap", "cross-chain", "bridge", "buy ZEC", "privacy", "CipherSwap", "NEAR Intents"],
-  icons: {
-    icon: [
-      { url: "/favicon-16x16.png", sizes: "16x16", type: "image/png" },
-      { url: "/favicon-32x32.png", sizes: "32x32", type: "image/png" },
-      { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
-    ],
-    apple: "/apple-touch-icon.png",
-  },
   manifest: "/manifest.json",
   openGraph: {
     title: "CipherSwap — Buy ZEC from any chain",
@@ -43,6 +36,11 @@ export const metadata: Metadata = {
     title: "CipherSwap — Buy ZEC from any chain",
     description: "Swap any crypto to Zcash (ZEC) from 15+ blockchains.",
   },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#0B0C0E",
+  colorScheme: "dark",
 };
 
 export default function RootLayout({

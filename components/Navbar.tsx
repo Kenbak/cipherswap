@@ -1,39 +1,46 @@
 'use client';
 
-import Image from 'next/image';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { useZecPrice } from '@/app/_components/ZecPriceContext';
+import { BrandLogo } from './BrandLogo';
+
+const LINKS = [
+  { href: '/', label: 'Swap' },
+  { href: '/exposure', label: 'Audit' },
+  { href: '/how-it-works', label: 'How it works' },
+];
 
 export function Navbar() {
+  const pathname = usePathname();
   const { price, change24h } = useZecPrice();
 
   return (
-    <header className="border-b border-glass-4 sticky top-0 z-50" style={{ backgroundColor: 'rgba(20, 22, 31, 0.9)', backdropFilter: 'blur(20px)' }}>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-14 flex items-center justify-between">
-        <Link href="/" className="flex items-center gap-2.5 group">
-          <Image
-            src="/logo.png"
-            alt="CipherSwap Logo"
-            width={22}
-            height={22}
-            unoptimized
-            priority
-            style={{ width: 22, height: 22 }}
-            className="group-hover:scale-105 transition-transform"
-          />
-          <span className="text-sm font-bold font-mono tracking-wide">
-            <span className="text-cipher-cyan">Cipher</span>
-            <span className="text-primary">Swap</span>
-          </span>
+    <header className="site-nav sticky top-0 z-50">
+      <div className="max-w-6xl h-full mx-auto px-4 sm:px-6 flex items-center gap-3">
+        <Link href="/" aria-label="CipherSwap home" className="shrink-0 mr-2 sm:mr-4">
+          <BrandLogo />
         </Link>
 
+        <nav aria-label="Main" className="flex items-center gap-0.5 min-w-0 overflow-x-auto no-scrollbar">
+          {LINKS.map((l) => {
+            const active = l.href === '/' ? pathname === '/' || pathname.startsWith('/swap') : pathname.startsWith(l.href);
+            return (
+              <Link key={l.href} href={l.href} aria-current={active ? 'page' : undefined} className={`nav-link whitespace-nowrap ${l.href === '/how-it-works' ? 'hidden sm:inline-block' : ''}`}>
+                {l.label}
+              </Link>
+            );
+          })}
+        </nav>
+
         {price != null && (
-          <div className="flex items-center gap-1.5 font-mono text-[11px]">
-            <span className="text-muted">ZEC</span>
+          <div className="ml-auto flex items-center gap-1.5 term !text-[0.8125rem] shrink-0" title="ZEC price (CoinGecko)">
+            <span className="w-2 h-2 bg-cipher-gold" aria-hidden />
+            <span className="text-muted hidden sm:inline">ZEC</span>
             <span className="text-primary">${price.toFixed(2)}</span>
             {change24h != null && (
               <span className={change24h >= 0 ? 'text-cipher-green' : 'text-cipher-orange'}>
-                [{change24h >= 0 ? '\u2191' : '\u2193'}{Math.abs(change24h).toFixed(1)}%]
+                {change24h >= 0 ? '+' : '−'}{Math.abs(change24h).toFixed(1)}%
               </span>
             )}
           </div>

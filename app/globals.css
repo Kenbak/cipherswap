@@ -3,41 +3,42 @@
 @tailwind utilities;
 
 /**
- * CipherSwap Design System
- * Inherits the CipherScan design tokens for visual consistency.
+ * CipherSwap design system.
+ * Tokens mirror ZecBlock (zcash-explorer `app/globals.css`) so the two products
+ * read as one family: warm near-black canvas, gold accent, tight radii,
+ * ambient shadows only — no colored glow.
  */
 
 :root {
-  --color-bg: #08090F;
-  --color-elevated: #0E1018;
-  --color-surface: rgba(20, 22, 31, 0.55);
-  --color-surface-solid: #14161F;
-  --color-input: #12151E;
-  --color-inset: #161922;
-  --color-hover: #1A1D28;
-  --color-active: #22252F;
-  --color-border: rgba(30, 41, 59, 0.6);
-  --color-border-subtle: rgba(255, 255, 255, 0.04);
-  --color-border-rgb: 30 41 59;
+  --color-bg: #0B0C0E;
+  --color-elevated: #191B1F;
+  --color-surface: #111316;
+  --color-surface-solid: #111316;
+  --color-input: #0B0C0E;
+  --color-inset: #15171B;
+  --color-hover: #15171B;
+  --color-active: #1E2127;
+  --color-border: #24272D;
+  --color-border-subtle: #1A1D22;
+  --color-border-rgb: 36 39 45;
 
-  --color-cyan-rgb: 0 212 255;
-  --color-green-rgb: 0 230 118;
-  --color-yellow-rgb: 244 183 40;
-  --color-purple-rgb: 167 139 250;
-  --color-orange-rgb: 255 107 53;
+  --color-gold-rgb: 248 188 33;
+  --color-green-rgb: 101 199 154;
+  --color-yellow-rgb: 248 188 33;
+  --color-purple-rgb: 182 160 224;
+  --color-orange-rgb: 226 166 110;
+  --danger-rgb: 213 141 134;
 
-  --color-cyan: #00D4FF;
-  --color-cyan-glow: #00E5FF;
-  --color-cyan-muted: #5EBBCE;
-  --color-green: #00E676;
-  --color-yellow: #F4B728;
-  --color-purple: #A78BFA;
-  --color-purple-glow: #C4B5FD;
-  --color-orange: #FF6B35;
+  --color-gold: #F8BC21;
+  --color-green: #65C79A;
+  --color-yellow: #F8BC21;
+  --color-purple: #B6A0E0;
+  --color-orange: #E2A66E;
+  --danger: #D58D86;
 
-  --color-text-primary: #E5E7EB;
-  --color-text-secondary: #9CA3AF;
-  --color-text-muted: #6B7280;
+  --color-text-primary: #F1F3F5;
+  --color-text-secondary: #C2C7CF;
+  --color-text-muted: #9CA4B0;
 
   --glass-2: rgba(255, 255, 255, 0.02);
   --glass-3: rgba(255, 255, 255, 0.03);
@@ -47,50 +48,36 @@
   --glass-12: rgba(255, 255, 255, 0.12);
   --glass-18: rgba(255, 255, 255, 0.18);
 
-  --shadow-card: 0 2px 4px rgba(0, 0, 0, 0.08), 0 8px 16px rgba(0, 0, 0, 0.12);
-  --shadow-card-hover: 0 4px 8px rgba(0, 0, 0, 0.1), 0 16px 32px rgba(0, 0, 0, 0.16);
-  --shadow-glow: 0 0 20px rgba(0, 212, 255, 0.15);
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.28), 0 12px 28px -16px rgba(0, 0, 0, 0.7);
+  --card-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.04);
 
-  --radius-sm: 6px;
-  --radius-md: 10px;
-  --radius-lg: 16px;
-  --radius-xl: 20px;
-  --radius-2xl: 24px;
+  --btn-primary-bg: #F8BC21;
+  --btn-primary-text: #20221D;
+
+  --nav-height: 3.5rem;
 
   --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
-  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
   --duration-fast: 150ms;
   --duration-normal: 250ms;
-  --duration-slow: 400ms;
 }
 
 .light {
-  --color-bg: #F4F5F7;
-  --color-elevated: #ECEEF2;
-  --color-surface: #F8FAFC;
-  --color-surface-solid: #F8FAFC;
-  --color-input: #FFFFFF;
-  --color-inset: #F1F5F9;
-  --color-hover: #ECEEF2;
-  --color-active: #E2E8F0;
-  --color-border: #D8DEE6;
-  --color-border-subtle: #ECEEF2;
-  --color-border-rgb: 216 222 230;
+  --color-bg: #F6F7F9;
+  --color-elevated: #EFF1F4;
+  --color-surface: #FFFFFF;
+  --color-surface-solid: #FFFFFF;
+  --color-input: #F6F7F9;
+  --color-inset: #F0F2F6;
+  --color-hover: #F0F2F6;
+  --color-active: #E7EAEF;
+  --color-border: #DFE3E9;
+  --color-border-subtle: #EDEFF3;
+  --color-border-rgb: 223 227 233;
 
-  --color-cyan-rgb: 0 151 178;
-  --color-green-rgb: 5 150 105;
-  --color-yellow-rgb: 212 155 0;
-  --color-purple-rgb: 124 58 237;
-  --color-orange-rgb: 194 65 12;
-
-  --color-cyan: #0097B2;
-  --color-cyan-glow: #0891B2;
-  --color-cyan-muted: #0891B2;
-  --color-green: #059669;
-  --color-yellow: #D49B00;
-  --color-purple: #7C3AED;
-  --color-purple-glow: #8B5CF6;
-  --color-orange: #C2410C;
+  --color-gold-rgb: 176 124 0;
+  --color-green-rgb: 5 130 90;
+  --color-orange-rgb: 178 98 30;
+  --danger-rgb: 185 60 50;
 
   --color-text-primary: #0F172A;
   --color-text-secondary: #475569;
@@ -104,18 +91,18 @@
   --glass-12: rgba(0, 0, 0, 0.12);
   --glass-18: rgba(0, 0, 0, 0.18);
 
-  --shadow-card: none;
-  --shadow-card-hover: 0 1px 3px rgba(0, 0, 0, 0.06);
-  --shadow-glow: none;
+  --shadow-card: 0 1px 2px rgba(15, 23, 42, 0.06), 0 12px 28px -16px rgba(15, 23, 42, 0.18);
+  --card-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.8);
 }
 
 @layer base {
   html {
     background-color: var(--color-bg);
+    scroll-behavior: smooth;
   }
 
   body {
-    @apply font-sans transition-colors duration-normal;
+    @apply font-sans;
     background-color: var(--color-bg);
     color: var(--color-text-primary);
     -webkit-font-smoothing: antialiased;
@@ -126,76 +113,50 @@
     @apply font-mono;
   }
 
-  html {
-    scroll-behavior: smooth;
+  :focus-visible {
+    outline: 2px solid var(--color-gold);
+    outline-offset: 2px;
   }
 
-  :focus-visible {
-    outline: 2px solid var(--color-cyan);
-    outline-offset: 2px;
+  ::selection {
+    background: rgb(var(--color-gold-rgb) / 0.3);
   }
 }
 
 @layer components {
+  .text-primary { color: var(--color-text-primary); }
+  .text-secondary { color: var(--color-text-secondary); }
+  .text-muted { color: var(--color-text-muted); }
+
+  /* Surfaces are milled from the canvas: one hairline, one lit top edge, one ambient shadow. */
   .card {
     background: var(--color-surface);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    border-radius: 16px;
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
     padding: 24px;
-    overflow: visible;
     min-width: 0;
-    box-shadow:
-      0 0 0 1px rgba(0, 0, 0, 0.03),
-      0 2px 4px rgba(0, 0, 0, 0.05),
-      0 12px 24px rgba(0, 0, 0, 0.1);
-    transition: all 250ms cubic-bezier(0.16, 1, 0.3, 1);
+    box-shadow: var(--shadow-card), var(--card-highlight);
   }
 
-  .card:hover:not(.card-static) {
-    box-shadow:
-      0 0 0 1px rgba(0, 212, 255, 0.06),
-      0 4px 8px rgba(0, 0, 0, 0.06),
-      0 16px 32px rgba(0, 0, 0, 0.12);
+  .swap-card {
+    background-color: var(--color-surface-solid);
+    border: 1px solid var(--color-border);
+    border-radius: 12px;
+    box-shadow: var(--shadow-card), var(--card-highlight);
   }
 
-  .light .card {
-    background: var(--color-surface);
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
-    border: 1px solid #E2E8F0;
-    box-shadow: none;
+  /* Inset well inside a card — drops to the canvas color. */
+  .panel {
+    background-color: var(--color-input);
+    border: 1px solid var(--color-border-subtle);
+    border-radius: 8px;
+    transition: border-color var(--duration-fast) ease;
   }
 
-  .light .card:hover:not(.card-static) {
-    border-color: #CBD5E1;
-    box-shadow: none;
+  .panel:focus-within {
+    border-color: rgb(var(--color-gold-rgb) / 0.4);
   }
 
-  .text-primary {
-    color: var(--color-text-primary);
-  }
-
-  .text-secondary {
-    color: var(--color-text-secondary);
-  }
-
-  .text-muted {
-    color: var(--color-text-muted);
-  }
-
-  .light .text-red-400 { color: #DC2626; }
-
-  .modal-backdrop {
-    background-color: rgba(0, 0, 0, 0.8);
-  }
-
-  .light .modal-backdrop {
-    background-color: rgba(0, 0, 0, 0.5);
-  }
-
-  /* Solid surfaces — avoid stacking translucent glass on translucent card */
   .surface-solid {
     background-color: var(--color-surface-solid);
     border: 1px solid var(--color-border-subtle);
@@ -209,52 +170,130 @@
   .input-shell {
     background-color: var(--color-input);
     border: 1px solid var(--color-border-subtle);
-    border-radius: 8px;
-    transition: border-color 150ms ease, box-shadow 150ms ease;
+    border-radius: 6px;
+    transition: border-color var(--duration-fast) ease;
   }
 
   .input-shell:focus-within {
-    border-color: rgb(var(--color-cyan-rgb) / 0.4);
-    box-shadow: 0 0 0 3px rgb(var(--color-cyan-rgb) / 0.06);
+    border-color: rgb(var(--color-gold-rgb) / 0.4);
   }
+
+  .modal-backdrop { background-color: rgba(0, 0, 0, 0.72); }
+  .light .modal-backdrop { background-color: rgba(15, 23, 42, 0.4); }
 
   .btn-primary {
     display: block;
     width: 100%;
     padding: 0.875rem 1rem;
-    border-radius: 8px;
+    border-radius: 6px;
     border: none;
-    font-family: var(--font-geist-mono), monospace;
-    font-size: 0.875rem;
+    font-family: var(--font-geist-sans), system-ui, sans-serif;
+    font-size: 0.9375rem;
     font-weight: 600;
     line-height: 1.25;
     cursor: pointer;
-    transition: background-color 150ms ease, box-shadow 150ms ease, transform 150ms ease;
-    background-color: var(--color-cyan);
-    color: #08090F;
+    background-color: var(--btn-primary-bg);
+    color: var(--btn-primary-text);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+    transition: filter var(--duration-fast) ease, background-color var(--duration-fast) ease;
   }
 
-  .btn-primary:not(:disabled):hover {
-    box-shadow: 0 4px 20px rgb(var(--color-cyan-rgb) / 0.25);
-    transform: translateY(-1px);
-  }
-
-  .btn-primary:not(:disabled):active {
-    transform: translateY(0);
-    box-shadow: none;
-  }
+  .btn-primary:not(:disabled):hover { filter: brightness(1.06); }
 
   .btn-primary:disabled {
     background-color: var(--color-active);
     color: var(--color-text-muted);
     cursor: not-allowed;
     box-shadow: none;
-    transform: none;
   }
-}
 
-@layer components {
-  /* ── Cipherpunk ambient background (discreet) ── */
+  .btn-secondary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.625rem 1rem;
+    border-radius: 6px;
+    border: 1px solid var(--color-border);
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--color-text-primary);
+    transition: background-color var(--duration-fast) ease, border-color var(--duration-fast) ease;
+  }
+
+  .btn-secondary:hover { background-color: var(--color-hover); }
+
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.125rem 0.5rem;
+    border-radius: 3px;
+    font-size: 0.75rem;
+    line-height: 1.25rem;
+    border: 1px solid var(--color-border);
+    color: var(--color-text-secondary);
+    white-space: nowrap;
+  }
+
+  .kbd {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.25rem;
+    height: 1.25rem;
+    padding: 0 0.3rem;
+    border-radius: 3px;
+    border: 1px solid var(--color-border);
+    font-family: var(--font-geist-mono), monospace;
+    font-size: 0.6875rem;
+    color: var(--color-text-muted);
+  }
+
+  /* Monospace machine output: status line, logs, hashes. */
+  .term {
+    font-family: var(--font-geist-mono), monospace;
+    font-size: 0.75rem;
+    line-height: 1.6;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* `> KEY` eyebrow, shared with ZecBlock's section headers. */
+  .eyebrow {
+    font: 500 0.75rem/1.5 var(--font-geist-mono), monospace;
+    letter-spacing: 0.035em;
+    text-transform: uppercase;
+    color: var(--color-text-muted);
+  }
+
+  .eyebrow::before {
+    content: '> ';
+    opacity: 0.5;
+  }
+
+  /* One chrome band: nav paints the canvas, a single hairline closes it. */
+  .site-nav {
+    height: var(--nav-height);
+    background-color: rgb(11 12 14 / 0.85);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .light .site-nav { background-color: rgb(246 247 249 / 0.85); }
+
+  .nav-link {
+    font: 500 0.8125rem/1 var(--font-geist-mono), monospace;
+    color: var(--color-text-muted);
+    padding: 0.5rem 0.625rem;
+    border-radius: 4px;
+    transition: color var(--duration-fast) ease, background-color var(--duration-fast) ease;
+  }
+
+  .nav-link:hover { color: var(--color-text-primary); background-color: var(--color-hover); }
+  .nav-link[aria-current='page'] { color: var(--color-text-primary); }
+
+  /* ── Backdrop: a faint neutral grid, nothing else ── */
   .cipher-bg {
     position: fixed;
     inset: 0;
@@ -267,111 +306,24 @@
   .cipher-bg__grid {
     position: absolute;
     inset: -1px;
-    opacity: 0.35;
     background-image:
-      linear-gradient(rgb(var(--color-cyan-rgb) / 0.045) 1px, transparent 1px),
-      linear-gradient(90deg, rgb(var(--color-cyan-rgb) / 0.045) 1px, transparent 1px);
-    background-size: 56px 56px;
-    mask-image: radial-gradient(ellipse 85% 70% at 50% 38%, black 15%, transparent 72%);
+      linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+    background-size: 48px 48px;
+    mask-image: radial-gradient(ellipse 80% 65% at 50% 35%, black 10%, transparent 75%);
   }
 
-  .cipher-bg__orb {
-    position: absolute;
-    border-radius: 50%;
-    filter: blur(72px);
-    will-change: transform;
-  }
-
-  .cipher-bg__orb--cyan {
-    width: min(52vw, 520px);
-    height: min(52vw, 520px);
-    top: -12%;
-    left: -8%;
-    background: radial-gradient(circle, rgb(var(--color-cyan-rgb) / 0.22) 0%, transparent 68%);
-    animation: cipher-drift-a 28s ease-in-out infinite;
-  }
-
-  .cipher-bg__orb--green {
-    width: min(44vw, 440px);
-    height: min(44vw, 440px);
-    bottom: -18%;
-    right: -6%;
-    background: radial-gradient(circle, rgb(var(--color-green-rgb) / 0.14) 0%, transparent 70%);
-    animation: cipher-drift-b 34s ease-in-out infinite;
-  }
-
-  .cipher-bg__orb--yellow {
-    width: min(28vw, 280px);
-    height: min(28vw, 280px);
-    top: 42%;
-    right: 12%;
-    background: radial-gradient(circle, rgb(var(--color-yellow-rgb) / 0.09) 0%, transparent 72%);
-    animation: cipher-drift-c 40s ease-in-out infinite;
+  .light .cipher-bg__grid {
+    background-image:
+      linear-gradient(rgba(15, 23, 42, 0.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(15, 23, 42, 0.05) 1px, transparent 1px);
   }
 
   .cipher-bg__noise {
     position: absolute;
     inset: 0;
-    opacity: 0.035;
+    opacity: 0.03;
     background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-  }
-
-  .cipher-bg__scanlines {
-    position: absolute;
-    inset: 0;
-    opacity: 0.04;
-    background: repeating-linear-gradient(
-      0deg,
-      transparent,
-      transparent 2px,
-      rgba(255, 255, 255, 0.03) 2px,
-      rgba(255, 255, 255, 0.03) 3px
-    );
-    mask-image: radial-gradient(ellipse 90% 80% at 50% 40%, black 10%, transparent 75%);
-  }
-
-  .cipher-bg__vignette {
-    position: absolute;
-    inset: 0;
-    background: radial-gradient(
-      ellipse 100% 90% at 50% 32%,
-      transparent 0%,
-      var(--color-bg) 78%
-    );
-  }
-
-  .light .cipher-bg__grid {
-    opacity: 0.2;
-    background-image:
-      linear-gradient(rgb(var(--color-cyan-rgb) / 0.06) 1px, transparent 1px),
-      linear-gradient(90deg, rgb(var(--color-cyan-rgb) / 0.06) 1px, transparent 1px);
-  }
-
-  .light .cipher-bg__orb--cyan {
-    background: radial-gradient(circle, rgb(var(--color-cyan-rgb) / 0.12) 0%, transparent 68%);
-  }
-
-  .light .cipher-bg__orb--green {
-    background: radial-gradient(circle, rgb(var(--color-green-rgb) / 0.08) 0%, transparent 70%);
-  }
-
-  .light .cipher-bg__scanlines {
-    opacity: 0.025;
-  }
-
-  @keyframes cipher-drift-a {
-    0%, 100% { transform: translate(0, 0) scale(1); }
-    50% { transform: translate(4%, 3%) scale(1.04); }
-  }
-
-  @keyframes cipher-drift-b {
-    0%, 100% { transform: translate(0, 0) scale(1); }
-    50% { transform: translate(-3%, -4%) scale(1.05); }
-  }
-
-  @keyframes cipher-drift-c {
-    0%, 100% { transform: translate(0, 0); opacity: 0.85; }
-    50% { transform: translate(-2%, 2%); opacity: 1; }
   }
 }
 
@@ -386,10 +338,6 @@
       animation-duration: 0.01ms !important;
       animation-iteration-count: 1 !important;
       transition-duration: 0.01ms !important;
-    }
-
-    .cipher-bg__orb {
-      animation: none !important;
     }
   }
 }

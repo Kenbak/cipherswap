@@ -24,32 +24,19 @@ const config: Config = {
           'surface-light': '#FFFFFF',
           'border-light': '#E2E8F0',
 
-          cyan: 'rgb(var(--color-cyan-rgb) / <alpha-value>)',
-          'cyan-bright': '#00D4FF',
-          'cyan-glow': '#00E5FF',
-          'cyan-muted': '#5EBBCE',
-
+          gold: 'rgb(var(--color-gold-rgb) / <alpha-value>)',
           green: 'rgb(var(--color-green-rgb) / <alpha-value>)',
-          'green-bright': '#00E676',
-
           purple: 'rgb(var(--color-purple-rgb) / <alpha-value>)',
-          'purple-bright': '#A78BFA',
-          'purple-glow': '#C4B5FD',
-
           yellow: 'rgb(var(--color-yellow-rgb) / <alpha-value>)',
-          'yellow-bright': '#F4B728',
-          'yellow-glow': '#FFD060',
-          'yellow-muted': '#C9A035',
-
           orange: 'rgb(var(--color-orange-rgb) / <alpha-value>)',
-          'orange-bright': '#FF6B35',
 
           text: {
-            primary: '#E5E7EB',
-            secondary: '#9CA3AF',
-            muted: '#6B7280',
+            primary: 'var(--color-text-primary)',
+            secondary: 'var(--color-text-secondary)',
+            muted: 'var(--color-text-muted)',
           },
         },
+        danger: 'rgb(var(--danger-rgb) / <alpha-value>)',
         glass: {
           2: 'var(--glass-2)',
           3: 'var(--glass-3)',
@@ -79,12 +66,13 @@ const config: Config = {
       },
 
       borderRadius: {
-        'sm': '6px',
-        'DEFAULT': '8px',
-        'md': '10px',
-        'lg': '16px',
-        'xl': '20px',
-        '2xl': '24px',
+        'sm': '3px',
+        'DEFAULT': '4px',
+        'md': '4px',
+        'lg': '6px',
+        'xl': '8px',
+        '2xl': '12px',
+        '3xl': '12px',
       },
 
       boxShadow: {
@@ -92,8 +80,7 @@ const config: Config = {
         'card-hover': '0 4px 8px rgba(0, 0, 0, 0.06), 0 16px 32px rgba(0, 0, 0, 0.1)',
         'sm': '0 1px 2px rgba(0, 0, 0, 0.04), 0 2px 4px rgba(0, 0, 0, 0.04)',
         'lg': '0 4px 8px rgba(0, 0, 0, 0.04), 0 16px 32px rgba(0, 0, 0, 0.08)',
-        'glow': '0 0 20px rgba(0, 212, 255, 0.15)',
-        'glow-lg': '0 0 40px rgba(0, 212, 255, 0.2)',
+        
       },
 
       animation: {
