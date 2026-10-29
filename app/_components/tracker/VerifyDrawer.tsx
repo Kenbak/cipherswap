@@ -112,7 +112,7 @@ export function VerifyDrawer({
               ))}
               {d?.intentHashes?.map((h) => <Field key={h} label="Intent hash" value={h} />)}
               {d?.destinationChainTxHashes?.map((t) => (
-                <Field key={t.hash} label="ZEC delivery" value={t.hash} href={`https://cipherscan.app/tx/${t.hash}`} />
+                <Field key={t.hash} label="ZEC delivery" value={t.hash} href={`https://zecblock.com/tx/${t.hash}`} />
               ))}
             </section>
           ) : null}
