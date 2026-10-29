@@ -22,7 +22,7 @@ export function Footer() {
           <span className="text-muted/40" aria-hidden>|</span>
           <a href="https://zecblock.com/" target="_blank" rel="noopener noreferrer" className={LINK}>ZecBlock ↗</a>
           <a href="https://cipherpay.app" target="_blank" rel="noopener noreferrer" className={LINK}>CipherPay ↗</a>
-          <a href="https://x.com/cipherscan_app" target="_blank" rel="noopener noreferrer" className={LINK}>X ↗</a>
+          <a href="https://x.com/zecblock" target="_blank" rel="noopener noreferrer" className={LINK}>X ↗</a>
         </nav>
 
         {SHA ? (

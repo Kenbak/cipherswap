@@ -628,7 +628,7 @@ function ShareRow({ shareParams, grade, verdict }: { shareParams: URLSearchParam
 
   const shareOnX = () => {
     const pageUrl = typeof window !== 'undefined' ? window.location.href : 'https://cipherswap.app/exposure';
-    const text = `I audited my wallet's traceability on @cipherscan_app and got a ${grade} — "${verdict}". 😳\n\nSee what the blockchain reveals about you:`;
+    const text = `I audited my wallet's traceability on @zecblock and got a ${grade} — "${verdict}". 😳\n\nSee what the blockchain reveals about you:`;
     const url = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(pageUrl)}`;
     window.open(url, '_blank', 'noopener,noreferrer');
   };
