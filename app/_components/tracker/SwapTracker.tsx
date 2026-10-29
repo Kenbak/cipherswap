@@ -425,7 +425,7 @@ function Receipt({ status, quote, recipient }: { status: StatusResponse; quote?:
         {zecTx && (
           <div className="flex items-center justify-between gap-3 text-sm pt-1 border-t border-glass-4">
             <span className="text-muted">Zcash transaction</span>
-            <TxLink href={`https://cipherscan.app/tx/${zecTx}`} label={`${shortAddress(zecTx, 8, 6)} on CipherScan`} />
+            <TxLink href={`https://zecblock.com/tx/${zecTx}`} label={`${shortAddress(zecTx, 8, 6)} on ZecBlock`} />
           </div>
         )}
       </div>

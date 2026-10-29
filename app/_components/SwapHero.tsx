@@ -46,7 +46,7 @@ export function SwapHero({ stats }: { stats: NetworkStats | null }) {
             </div>
           ))}
           <div className="self-end pb-1">
-            <a href="https://cipherscan.app/crosschain" target="_blank" rel="noopener noreferrer" className="term text-muted hover:text-primary">
+            <a href="https://zecblock.com/crosschain" target="_blank" rel="noopener noreferrer" className="term text-muted hover:text-primary">
               NEAR Intents · ZecBlock ↗
             </a>
           </div>

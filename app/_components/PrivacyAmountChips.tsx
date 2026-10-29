@@ -60,7 +60,7 @@ export function PrivacyAmountChips({ recommendations, selectedToken, currentAmou
       {why && (
         <p className="mt-1.5 text-xs text-muted leading-relaxed">
           These amounts match recent shielded ZEC activity (green = most common). Swapping a common amount makes it
-          harder to link your deposit to the ZEC that arrives. Data from CipherScan, last 30 days.
+          harder to link your deposit to the ZEC that arrives. Data from ZecBlock, last 30 days.
         </p>
       )}
     </div>
