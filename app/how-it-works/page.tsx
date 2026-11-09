@@ -98,8 +98,7 @@ export default function HowItWorksPage() {
             { who: 'NEAR Intents / solvers', sees: 'Your amounts, deposit address, refund address and ZEC recipient: what they need to execute and refund the swap.' },
             { who: 'Public blockchains', sees: 'Your deposit on the source chain is public. ZEC sent to a transparent (t1) address is public. To a shielded address, the amount entering the pool is visible; later use is private.' },
             { who: 'Your browser', sees: 'Recent swaps (for tracking) and the last wallet name you used, kept in local storage for 7 days. Never sent anywhere.' },
-            { who: 'Wallet connection', sees: 'Only your public address, used to read your balance and fill the refund address. Solana balance lookups are proxied through our server; EVM and Tron use your wallet’s own RPC. Leather (Bitcoin) balance lookups query mempool.space directly from your browser.' },
-            { who: 'MoonPay (optional)', sees: 'If you buy crypto with a card, MoonPay runs ID checks (KYC) and sees what you give them. That path is clearly marked.' },
+            { who: 'Wallet connection', sees: 'Only your public address, used to read your balance and fill the refund address. Solana balance lookups are proxied through our server; EVM and Tron use your wallet’s own RPC. Leather (Bitcoin) balance lookups are also proxied through our server.' },
           ]}
         />
         <LocalDataControls />

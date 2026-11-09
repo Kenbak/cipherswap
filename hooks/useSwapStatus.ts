@@ -29,8 +29,6 @@ export function useSwapStatus(depositAddress: string, depositMemo: string | unde
     if (createdAt === null) return;
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | null = null;
-    const qs = new URLSearchParams({ depositAddress });
-    if (depositMemo) qs.set('depositMemo', depositMemo);
 
     const schedule = (ms: number) => {
       if (cancelled) return;
@@ -40,7 +38,12 @@ export function useSwapStatus(depositAddress: string, depositMemo: string | unde
 
     const poll = async () => {
       try {
-        const res = await fetch(`/api/swap/status?${qs}`, { cache: 'no-store' });
+        const res = await fetch('/api/swap/status', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ depositAddress, depositMemo }),
+          cache: 'no-store',
+        });
         const json = await res.json().catch(() => null);
         if (cancelled) return;
 

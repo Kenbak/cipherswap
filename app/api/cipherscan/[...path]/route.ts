@@ -2,16 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 const CIPHERSCAN_API = 'https://api.mainnet.cipherscan.app';
 
-const ALLOWED_PREFIXES = [
-  'api/crosschain/',
-  'api/privacy/',
-  'api/swap/status',
-  'api/swap/tokens',
-];
-
-function isAllowed(path: string): boolean {
-  return ALLOWED_PREFIXES.some(p => path.startsWith(p));
-}
+const ALLOWED_PATHS = new Set(['api/crosschain/popular-pairs', 'api/privacy/common-amounts']);
 
 export async function GET(
   req: NextRequest,
@@ -19,7 +10,7 @@ export async function GET(
 ) {
   const { path } = await params;
   const joined = path.join('/');
-  if (!isAllowed(joined)) {
+  if (!ALLOWED_PATHS.has(joined)) {
     return NextResponse.json({ success: false, error: 'Not allowed' }, { status: 403 });
   }
 
@@ -39,9 +30,9 @@ export async function GET(
         'cache-control': 'public, max-age=30, s-maxage=60',
       },
     });
-  } catch (err: any) {
+  } catch {
     return NextResponse.json(
-      { success: false, error: err?.message ?? 'Upstream error' },
+      { success: false, error: 'Upstream error' },
       { status: 502 },
     );
   }
