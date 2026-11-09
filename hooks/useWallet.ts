@@ -446,22 +446,20 @@ export function useWallet(): UseWalletReturn {
       const tx = new Transaction();
 
       if (contractAddress) {
-        const { createTransferInstruction, getAssociatedTokenAddress, createAssociatedTokenAccountInstruction, getAccount } = await import('@solana/spl-token');
+        const { associatedTokenAddress, createAtaInstruction, createTokenTransferInstruction } = await import('@/lib/solana-token');
         const mint = new PublicKey(contractAddress);
         const from = new PublicKey(state.address!);
         const toPubkey = new PublicKey(to);
         const tokenAmount = parseUnits(amount, decimals);
 
-        const sourceAta = await getAssociatedTokenAddress(mint, from);
-        const destAta = await getAssociatedTokenAddress(mint, toPubkey, true);
+        const sourceAta = associatedTokenAddress(mint, from);
+        const destAta = associatedTokenAddress(mint, toPubkey);
 
-        try {
-          await getAccount(connection, destAta);
-        } catch {
-          tx.add(createAssociatedTokenAccountInstruction(from, destAta, toPubkey, mint));
+        if (!(await connection.getAccountInfo(destAta))) {
+          tx.add(createAtaInstruction(from, destAta, toPubkey, mint));
         }
 
-        tx.add(createTransferInstruction(sourceAta, destAta, from, tokenAmount));
+        tx.add(createTokenTransferInstruction(sourceAta, destAta, from, tokenAmount));
       } else {
         const { SystemProgram } = await import('@solana/web3.js');
         const lamports = parseUnits(amount, decimals);
@@ -609,10 +607,13 @@ export function useWallet(): UseWalletReturn {
             const res = await rawProvider.request('getAddresses');
             const addr = res?.result?.addresses?.[0]?.address;
             if (addr) {
-              const apiRes = await fetch(`https://mempool.space/api/address/${addr}`);
+              const apiRes = await fetch('/api/bitcoin/balance', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ address: addr }),
+              });
               const data = await apiRes.json();
-              const sats = (data?.chain_stats?.funded_txo_sum ?? 0) - (data?.chain_stats?.spent_txo_sum ?? 0);
-              return formatUnits(BigInt(sats), 8);
+              if (data?.success) return formatUnits(BigInt(data.sats), 8);
             }
           } catch (err) {
             console.error('[wallet] Leather balance fetch failed:', err);

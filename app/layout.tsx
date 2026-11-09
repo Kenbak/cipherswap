@@ -5,7 +5,7 @@ import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { CipherBackground } from "@/components/CipherBackground";
 import { ZecPriceProvider } from "./_components/ZecPriceContext";
-import { Analytics } from "@vercel/analytics/next";
+import { PrivateAnalytics } from "@/components/PrivateAnalytics";
 
 const geistSans = localFont({
   src: "../node_modules/geist/dist/fonts/geist-sans/Geist-Variable.woff2",
@@ -63,7 +63,7 @@ export default function RootLayout({
             <Footer />
           </div>
         </ZecPriceProvider>
-        <Analytics />
+        <PrivateAnalytics />
       </body>
     </html>
   );

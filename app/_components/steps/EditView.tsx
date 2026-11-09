@@ -38,7 +38,6 @@ interface EditViewProps {
   onChooseManual: () => void;
   onUseWallet: () => void;
   onReview: () => void;
-  buyWithCard: { show: boolean; loading: boolean; error: string | null; onOpen: () => void };
 }
 
 function cta(p: EditViewProps): { label: string; action: 'review' | 'connect' | null } {
@@ -66,7 +65,7 @@ export function EditView(props: EditViewProps) {
   const {
     state, amountRef, tokens, tokensLoading, pickerOpen, onPickerOpenChange, sendMode, walletName,
     balance, balanceLoading, preview, recommendations, onSelectToken, onSetAmount, onSetZecAddr,
-    onSetRefundAddr, onSetSlippage, onOpenWallet, onChooseManual, onUseWallet, onReview, buyWithCard,
+    onSetRefundAddr, onSetSlippage, onOpenWallet, onChooseManual, onUseWallet, onReview,
   } = props;
   const t = state.selectedToken;
   const q = preview.data?.quote;
@@ -146,16 +145,6 @@ export function EditView(props: EditViewProps) {
           />
         </div>
       )}
-
-      {buyWithCard.show && (
-        <div className="px-1 py-1 flex items-center justify-between gap-2">
-          <button type="button" onClick={buyWithCard.onOpen} disabled={buyWithCard.loading} className="text-xs text-secondary hover:text-cipher-gold transition-colors disabled:opacity-50">
-            {buyWithCard.loading ? 'Opening MoonPay…' : `No ${t.token}? Buy with card →`}
-          </button>
-          <span className="text-xs text-muted">MoonPay · requires ID (KYC)</span>
-        </div>
-      )}
-      {buyWithCard.error && <p className="px-1 text-xs text-danger">{buyWithCard.error}</p>}
 
       {/* You receive */}
       <div className="panel px-4 pt-3 pb-3">

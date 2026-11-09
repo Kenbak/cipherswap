@@ -84,6 +84,7 @@ export default function ExposureClient() {
     const chainParam = parseExposureChain(searchParams.get('chain'));
     if (addrParam && isValidAddress(chainParam, addrParam) && state === 'input') {
       setAddress(addrParam);
+      window.history.replaceState({}, '', window.location.pathname);
       handleScan(addrParam, chainParam);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -121,11 +122,6 @@ export default function ExposureClient() {
       setScanData(data);
       setScore(result);
       setState('results');
-
-      const url = new URL(window.location.href);
-      url.searchParams.set('address', addr);
-      url.searchParams.set('chain', scanChain);
-      window.history.replaceState({}, '', url.toString());
     } catch (err: any) {
       setErrorMessage(err.message || 'Scan failed. Please try again.');
       setState('error');
@@ -138,10 +134,6 @@ export default function ExposureClient() {
     setScanData(null);
     setScore(null);
     setErrorMessage('');
-    const url = new URL(window.location.href);
-    url.searchParams.delete('address');
-    url.searchParams.delete('chain');
-    window.history.replaceState({}, '', url.toString());
   };
 
   return (
@@ -627,7 +619,7 @@ function ShareRow({ shareParams, grade, verdict }: { shareParams: URLSearchParam
   const [downloading, setDownloading] = useState(false);
 
   const shareOnX = () => {
-    const pageUrl = typeof window !== 'undefined' ? window.location.href : 'https://cipherswap.app/exposure';
+    const pageUrl = 'https://cipherswap.app/exposure';
     const text = `I audited my wallet's traceability on @zecblock and got a ${grade} — "${verdict}". 😳\n\nSee what the blockchain reveals about you:`;
     const url = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(pageUrl)}`;
     window.open(url, '_blank', 'noopener,noreferrer');

@@ -31,14 +31,14 @@ export async function POST(req: NextRequest) {
     const res = await fetch(HELIUS_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
+      body: JSON.stringify({ jsonrpc: '2.0', id: body.id ?? null, method: body.method, params: Array.isArray(body.params) ? body.params : [] }),
     });
 
     const data = await res.json();
     return NextResponse.json(data);
-  } catch (error: any) {
+  } catch {
     return NextResponse.json(
-      { jsonrpc: '2.0', error: { code: -32603, message: error.message || 'Internal error' }, id: null },
+      { jsonrpc: '2.0', error: { code: -32603, message: 'Internal error' }, id: null },
       { status: 500 },
     );
   }

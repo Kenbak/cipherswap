@@ -8,11 +8,12 @@ function fail(error: string, status: number) {
   return NextResponse.json({ success: false, error }, { status });
 }
 
-export async function GET(req: NextRequest) {
+export async function POST(req: NextRequest) {
   if (!API_KEY) return fail('Swap API not configured', 503);
 
-  const depositAddress = req.nextUrl.searchParams.get('depositAddress');
-  const depositMemo = req.nextUrl.searchParams.get('depositMemo');
+  const body = await req.json().catch(() => null);
+  const depositAddress = typeof body?.depositAddress === 'string' ? body.depositAddress : '';
+  const depositMemo = typeof body?.depositMemo === 'string' ? body.depositMemo : '';
   if (!depositAddress || !DEPOSIT_ADDRESS_RE.test(depositAddress)) return fail('Valid depositAddress required', 400);
   if (depositMemo && !DEPOSIT_MEMO_RE.test(depositMemo)) return fail('Invalid depositMemo', 400);
 

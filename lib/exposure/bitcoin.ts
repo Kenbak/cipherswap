@@ -40,6 +40,11 @@ interface EsploraAddress {
   mempool_stats: { funded_txo_sum: number; spent_txo_sum: number; tx_count: number };
 }
 
+export async function getBitcoinBalanceSats(address: string): Promise<number> {
+  const { chain_stats: stats } = await esplora<EsploraAddress>(`/address/${address}`);
+  return stats.funded_txo_sum - stats.spent_txo_sum;
+}
+
 async function esplora<T>(path: string): Promise<T> {
   let lastError: unknown;
   for (const host of ESPLORA_HOSTS) {

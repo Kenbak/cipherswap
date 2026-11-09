@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -10,8 +10,6 @@ import { useTokenList } from '@/hooks/useTokenList';
 import { useBalance } from '@/hooks/useBalance';
 import { useRecommendations } from '@/hooks/useRecommendations';
 import { useQuotePreview } from '@/hooks/useQuotePreview';
-import { useMoonPay } from '@/hooks/useMoonPay';
-import { supportsMoonPayBuy } from '@/lib/moonpay';
 import { toSmallestUnit } from '@/lib/amount';
 import { humanizeQuoteError, humanizeWalletError, isUserRejection } from '@/lib/errors';
 import { shortAddress } from '@/lib/deposit';
@@ -58,7 +56,6 @@ export default function SwapClient({ initialTokens }: { initialTokens?: SourceTo
 
   const { balance, loading: balanceLoading } = useBalance({ ...wallet, connected: compatible }, t, balanceRefresh);
   const recommendations = useRecommendations(t);
-  const moonPay = useMoonPay();
   const reviewing = state.view !== 'edit';
   const refreshMs = reviewing ? REVIEW_REFRESH_MS : EDIT_REFRESH_MS;
   const preview = useQuotePreview({ token: t, amount: state.amount, slippageBps: state.slippageBps, refreshMs });
@@ -207,14 +204,6 @@ export default function SwapClient({ initialTokens }: { initialTokens?: SourceTo
     router.push(`/swap/${encodeURIComponent(depositAddress)}${qs}`);
   };
 
-  const openMoonPay = useCallback(() => {
-    if (!wallet.address) return;
-    moonPay.clearError();
-    moonPay.openBuyWidget({ walletAddress: wallet.address, selectedToken: t, onCompleted: () => setBalanceRefresh((n) => n + 1) });
-  }, [wallet.address, t, moonPay]);
-
-  const showCard = !!(moonPay.isConfigured && sendMode === 'wallet' && wallet.address && supportsMoonPayBuy(t.chain, wallet.walletType));
-
   return (
     <div className="w-full max-w-[480px] mx-auto space-y-3">
       <RecentSwaps />
@@ -255,7 +244,6 @@ export default function SwapClient({ initialTokens }: { initialTokens?: SourceTo
                 onChooseManual={() => { setWalletModal(false); dispatch({ type: 'set_manual', manual: true }); }}
                 onUseWallet={() => { dispatch({ type: 'set_manual', manual: false }); if (!compatible) setWalletModal(true); }}
                 onReview={() => dispatch({ type: 'review' })}
-                buyWithCard={{ show: showCard, loading: moonPay.loading, error: moonPay.error, onOpen: openMoonPay }}
               />
             </motion.div>
           ) : (
