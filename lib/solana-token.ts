@@ -1,15 +1,16 @@
-import { Buffer } from 'buffer';
 import { PublicKey, SystemProgram, TransactionInstruction } from '@solana/web3.js';
 
 const TOKEN_PROGRAM_ID = new PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA');
 const ASSOCIATED_TOKEN_PROGRAM_ID = new PublicKey('ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL');
 const TRANSFER_INSTRUCTION = 3;
+const U64_MAX = BigInt('0xffffffffffffffff');
 
-export function associatedTokenAddress(mint: PublicKey, owner: PublicKey): PublicKey {
-  return PublicKey.findProgramAddressSync(
-    [owner.toBuffer(), TOKEN_PROGRAM_ID.toBuffer(), mint.toBuffer()],
+export async function associatedTokenAddress(mint: PublicKey, owner: PublicKey): Promise<PublicKey> {
+  const [address] = await PublicKey.findProgramAddress(
+    [owner.toBytes(), TOKEN_PROGRAM_ID.toBytes(), mint.toBytes()],
     ASSOCIATED_TOKEN_PROGRAM_ID,
-  )[0];
+  );
+  return address;
 }
 
 export function createAtaInstruction(
@@ -28,7 +29,7 @@ export function createAtaInstruction(
       { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
       { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
     ],
-    data: Buffer.alloc(0),
+    data: new Uint8Array(0),
   });
 }
 
@@ -38,9 +39,14 @@ export function createTokenTransferInstruction(
   owner: PublicKey,
   amount: bigint,
 ): TransactionInstruction {
-  const data = Buffer.alloc(9);
-  data.writeUInt8(TRANSFER_INSTRUCTION, 0);
-  data.writeBigUInt64LE(amount, 1);
+  // DataView wraps out-of-range values silently; reject them instead.
+  if (amount < BigInt(0) || amount > U64_MAX) {
+    throw new RangeError('Token amount does not fit in u64');
+  }
+  const data = new Uint8Array(9);
+  const view = new DataView(data.buffer);
+  view.setUint8(0, TRANSFER_INSTRUCTION);
+  view.setBigUint64(1, amount, true);
   return new TransactionInstruction({
     programId: TOKEN_PROGRAM_ID,
     keys: [
