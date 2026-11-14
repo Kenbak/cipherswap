@@ -14,22 +14,15 @@ function compactUsd(n: number): string {
 
 export function SwapHero({ stats }: { stats: NetworkStats | null }) {
   return (
-    <div className="max-w-xl">
+    <div className="max-w-xl min-w-0">
       <p className="eyebrow">cross-chain → shielded zcash</p>
-      <h1 className="mt-3 font-mono font-bold text-primary tracking-tight leading-[1.05] text-[2rem] sm:text-5xl">
+      <h1 className="mt-3 font-medium text-primary tracking-[-0.035em] leading-[1.05] text-[2.25rem] sm:text-[3.25rem] text-balance">
         Buy <span className="text-cipher-gold">ZEC</span> from any chain.
       </h1>
-      <p className="mt-4 text-base sm:text-lg text-secondary">Swap from 15+ chains into shielded Zcash.</p>
+      <p className="mt-4 text-base sm:text-lg text-secondary max-w-md">Swap from 15+ chains into shielded Zcash.</p>
 
-      <ul className="mt-6 flex flex-wrap gap-x-5 gap-y-2">
-        {CLAIMS.map((c) => (
-          <li key={c} className="flex items-center gap-2 text-sm text-primary">
-            <span className="w-1.5 h-1.5 bg-cipher-gold" aria-hidden />
-            {c}
-          </li>
-        ))}
-      </ul>
-      <Link href="/how-it-works" className="mt-3 inline-block text-sm text-muted hover:text-primary transition-colors">
+      <p className="mt-5 text-sm text-muted">{CLAIMS.join(' · ')}</p>
+      <Link href="/how-it-works" className="mt-2 inline-block text-sm text-secondary hover:text-primary transition-colors">
         How it works →
       </Link>
 

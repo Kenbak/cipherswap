@@ -51,6 +51,7 @@ export function PriceDetails({
   onSetSlippage,
   loading,
   defaultOpen = false,
+  flush = false,
 }: {
   quote: QuoteResponse | null;
   token: SourceToken;
@@ -59,6 +60,7 @@ export function PriceDetails({
   onSetSlippage?: (bps: number) => void;
   loading?: boolean;
   defaultOpen?: boolean;
+  flush?: boolean;
 }) {
   const [open, setOpen] = useState(defaultOpen);
   const f = quote ? quoteFigures(quote, token) : null;
@@ -67,12 +69,12 @@ export function PriceDetails({
   const highCost = f?.costPct != null && f.costPct > HIGH_COST_PCT;
 
   return (
-    <div className="rounded-2xl border border-glass-4">
+    <div className={flush ? '' : 'rounded-2xl border border-glass-4'}>
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        className="w-full flex items-center justify-between gap-3 px-4 py-3 text-left"
+        className={`w-full flex items-center justify-between gap-3 text-left ${flush ? 'px-5 py-3' : 'px-4 py-3'}`}
       >
         <span className={`term truncate ${loading ? 'text-muted animate-pulse' : 'text-secondary'}`}>
           {f ? (
@@ -88,7 +90,7 @@ export function PriceDetails({
       </button>
 
       {open && (
-        <div className="px-4 pb-3 border-t border-glass-4 pt-2 animate-fade-in">
+        <div className={`pb-3 pt-2 border-t border-glass-4 animate-fade-in ${flush ? 'px-5' : 'px-4'}`}>
           <Row label="Route">
             {token.chainLabel} → NEAR Intents → {destination}
           </Row>

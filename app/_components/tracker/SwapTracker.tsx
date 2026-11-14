@@ -11,7 +11,6 @@ import { appendLog, getSwap, removeSwap, SWAP_HISTORY_EVENT, updateSwap, type Sw
 import { formatUsd, formatZec, fromSmallestUnit } from '@/lib/amount';
 import { shortAddress, zecAddressKind } from '@/lib/deposit';
 import { CHAIN_EXPLORERS, resolveAsset } from '../types';
-import { ZecAddressBadge } from '../ZecAddressField';
 import { CopyButton, ExternalIcon, Spinner } from '../ui';
 import { DepositPanel } from './DepositPanel';
 import { VerifyDrawer } from './VerifyDrawer';
@@ -29,7 +28,7 @@ function elapsed(fromMs: number, toMs: number): string {
   const sec = s % 60;
   const mm = String(m).padStart(2, '0');
   const ss = String(sec).padStart(2, '0');
-  return h ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
+  return h ? `${h}h ${mm}m` : m ? `${m}m ${ss}s` : `${sec}s`;
 }
 
 function statusDetail(s: StatusResponse): string | undefined {
@@ -72,8 +71,27 @@ function ProgressRail({ status, sent }: { status: SwapStatus | null; sent: boole
 }
 
 function StatusLog({ lines, liveLine, now }: { lines: SwapLogEntry[]; liveLine?: string | null; now: number }) {
+  const [open, setOpen] = useState(false);
   return (
-    <div className="rounded-2xl bg-black/30 border border-glass-4 px-4 py-3 overflow-x-auto" aria-label="Swap log">
+    <div>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className="flex items-center gap-1.5 text-xs text-muted hover:text-primary transition-colors"
+      >
+        <span aria-hidden className={`inline-block transition-transform ${open ? 'rotate-90' : ''}`}>›</span>
+        Activity log
+        {!open && liveLine && <span className="ml-2 font-mono text-muted/70">{liveLine.replace(/\s+/g, ' ')}</span>}
+      </button>
+      {open && <StatusLines lines={lines} liveLine={liveLine} now={now} />}
+    </div>
+  );
+}
+
+function StatusLines({ lines, liveLine, now }: { lines: SwapLogEntry[]; liveLine?: string | null; now: number }) {
+  return (
+    <div className="mt-2 rounded-lg bg-glass-2 border border-glass-4 px-3.5 py-2.5 overflow-x-auto" aria-label="Swap log">
       <ul className="term space-y-0.5 min-w-max">
         {lines.map((l, i) => (
           <li key={`${l.at}-${l.code}-${i}`} className="flex gap-3">
@@ -206,7 +224,7 @@ export function SwapTracker({ depositAddress, memo }: { depositAddress: string; 
   return (
     <div className="space-y-3">
       {/* Header */}
-      <div className="swap-card p-5 space-y-5">
+      <div className="swap-card p-5 sm:p-6 space-y-5">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
             <div className="flex items-center gap-2">
@@ -220,36 +238,34 @@ export function SwapTracker({ depositAddress, memo }: { depositAddress: string; 
               )}
               <span className="term text-muted">{meta?.code ?? 'connecting'}</span>
             </div>
-            <h1 className="mt-1.5 text-xl font-semibold text-primary" aria-live="polite">
+            <h1 className="mt-2 text-2xl font-medium tracking-[-0.025em] text-primary" aria-live="polite">
               {loading ? 'Checking swap status…' : meta?.title ?? 'Waiting for your deposit'}
             </h1>
           </div>
           {quotedAt ? (
-            <div className="text-right shrink-0">
-              <div className="term !text-base text-primary">T+{elapsed(quotedAt, endAt)}</div>
-              <div className="text-xs text-muted">{terminal ? 'total time' : 'since quote'}</div>
+            <div className="text-right shrink-0 pt-0.5">
+              <div className="text-sm text-secondary tabular-nums">{elapsed(quotedAt, endAt)}</div>
+              <div className="text-xs text-muted">{terminal ? 'total' : 'elapsed'}</div>
             </div>
           ) : null}
         </div>
 
         <ProgressRail status={current} sent={!!txHash && (!current || current === 'PENDING_DEPOSIT')} />
 
-        {asset && (
-          <div className="flex items-center justify-between gap-3 panel px-4 py-3">
+        {asset && current !== 'SUCCESS' && (
+          <div className="flex items-center justify-between gap-3 rounded-lg bg-glass-2 px-4 py-3">
             <div className="flex items-center gap-2.5 min-w-0">
               <TokenChainIcon token={asset.symbol} chain={asset.chain} size={28} />
               <div className="min-w-0">
-                <div className="term !text-sm text-primary truncate">{amountIn} {asset.symbol}</div>
+                <div className="text-sm text-primary tabular-nums truncate">{formatZec(amountIn, 6)} {asset.symbol}</div>
                 <div className="text-xs text-muted">{asset.chainLabel}</div>
               </div>
             </div>
             <span className="text-muted" aria-hidden>→</span>
             <div className="flex items-center gap-2.5 min-w-0">
               <div className="min-w-0 text-right">
-                <div className="term !text-sm text-primary truncate">
-                  {current === 'SUCCESS' && s?.swapDetails?.amountOutFormatted ? s.swapDetails.amountOutFormatted : `≈ ${formatZec(estOut, 6)}`} ZEC
-                </div>
-                <div className="text-xs text-muted">{current === 'SUCCESS' ? 'received' : 'estimated'}</div>
+                <div className="text-sm text-primary tabular-nums truncate">≈ {formatZec(estOut, 6)} ZEC</div>
+                <div className="text-xs text-muted">estimated</div>
               </div>
               <TokenChainIcon token="zec" chain="zec" size={28} />
             </div>
@@ -272,9 +288,10 @@ export function SwapTracker({ depositAddress, memo }: { depositAddress: string; 
         )}
 
         {awaitingDeposit && txHash && (
-          <div className="panel px-4 py-3 space-y-1.5">
-            <p className="text-sm text-primary">Sent from your wallet. Waiting for NEAR Intents to see the deposit.</p>
-            <p className="text-xs text-muted">This usually takes one or two block confirmations on {asset?.chainLabel ?? 'the source chain'}.</p>
+          <div className="space-y-1.5">
+            <p className="text-sm text-secondary leading-relaxed">
+              Sent from your wallet. It usually takes a block or two on {asset?.chainLabel ?? 'the source chain'} before NEAR Intents sees it.
+            </p>
             {originExplorer && <TxLink href={`${originExplorer}${txHash}`} label={`deposit tx ${shortAddress(txHash, 8, 6)}`} />}
           </div>
         )}
@@ -305,12 +322,13 @@ export function SwapTracker({ depositAddress, memo }: { depositAddress: string; 
 
         {current === 'PROCESSING' && (
           <p className="text-sm text-secondary">
-            Your deposit is confirmed. Solvers are filling the swap and sending ZEC to your address. You can close this page;
-            the link keeps working.
+            Deposit confirmed. ZEC is on its way. You can close this page; the link keeps working.
           </p>
         )}
 
-        {current === 'SUCCESS' && s && <Receipt status={s} quote={qr} recipient={recipient} />}
+        {current === 'SUCCESS' && s && (
+          <Receipt status={s} quote={qr} recipient={recipient} paid={asset ? `${formatZec(amountIn, 6)} ${asset.symbol}` : null} />
+        )}
 
         {current === 'REFUNDED' && s && (
           <div className="space-y-2 text-sm text-secondary">
@@ -360,7 +378,7 @@ export function SwapTracker({ depositAddress, memo }: { depositAddress: string; 
               I haven&apos;t sent anything, discard
             </button>
           )}
-          <Link href="/" className="text-secondary hover:text-primary">New swap →</Link>
+          {current !== 'SUCCESS' && <Link href="/" className="text-secondary hover:text-primary">New swap →</Link>}
         </span>
       </div>
 
@@ -387,63 +405,66 @@ export function SwapTracker({ depositAddress, memo }: { depositAddress: string; 
   );
 }
 
-function Receipt({ status, quote, recipient }: { status: StatusResponse; quote?: QuoteResponse; recipient: string }) {
+function Receipt({ status, quote, recipient, paid }: { status: StatusResponse; quote?: QuoteResponse; recipient: string; paid: string | null }) {
   const d = status.swapDetails;
   const zecTx = d?.destinationChainTxHashes?.[0]?.hash;
   const inUsd = parseFloat(d?.amountInUsd ?? '');
   const outUsd = parseFloat(d?.amountOutUsd ?? '');
   const cost = inUsd > 0 && outUsd > 0 ? (1 - outUsd / inUsd) * 100 : null;
   const took = quote ? Date.parse(status.updatedAt) - Date.parse(quote.timestamp) : null;
-  const transparent = zecAddressKind(recipient) === 'transparent';
+  const kind = zecAddressKind(recipient);
+  const transparent = kind === 'transparent';
 
   return (
-    <div className="space-y-3">
-      <div className="panel px-4 py-4 space-y-2.5">
-        <div className="flex items-baseline justify-between gap-3">
-          <span className="text-sm text-secondary">Received</span>
-          <span className="text-right">
-            <span className="font-mono text-2xl text-cipher-green tabular-nums">{d?.amountOutFormatted ?? '—'} ZEC</span>
-            {d?.amountOutUsd && <span className="block term text-muted">≈ {formatUsd(d.amountOutUsd)}</span>}
-          </span>
+    <div className="space-y-5">
+      <div className="text-center py-2">
+        <div className="text-[2.25rem] font-medium tracking-tight leading-none tabular-nums text-primary">
+          {d?.amountOutFormatted ? formatZec(d.amountOutFormatted, 8) : '—'} <span className="text-secondary text-2xl">ZEC</span>
         </div>
-        <div className="flex items-center justify-between gap-3 text-sm">
-          <span className="text-muted">To</span>
-          <span className="flex items-center gap-2">
-            <span className="term text-secondary">{shortAddress(recipient, 8, 6)}</span>
-            <ZecAddressBadge address={recipient} />
-          </span>
+        <div className="mt-2 text-sm text-muted tabular-nums">
+          {d?.amountOutUsd ? `≈ ${formatUsd(d.amountOutUsd)}` : ''}
+          {paid ? ` · for ${paid}` : ''}
+        </div>
+      </div>
+
+      <dl className="divide-y divide-glass-4 border-y border-glass-4 text-sm">
+        <div className="flex items-center justify-between gap-3 py-2.5">
+          <dt className="text-muted">To</dt>
+          <dd className="flex items-center gap-2 text-secondary">
+            <span className="font-mono text-[0.8125rem]">{shortAddress(recipient, 6, 6)}</span>
+            <span className={transparent ? 'text-cipher-orange' : 'text-muted'}>{transparent ? 'transparent' : kind ? 'shielded' : ''}</span>
+          </dd>
         </div>
         {took != null && took > 0 && (
-          <div className="flex items-center justify-between gap-3 text-sm">
-            <span className="text-muted">Took</span>
-            <span className="term text-secondary">{elapsed(0, took)}</span>
+          <div className="flex items-center justify-between gap-3 py-2.5">
+            <dt className="text-muted">Took</dt>
+            <dd className="text-secondary tabular-nums">{elapsed(0, took)}</dd>
           </div>
         )}
         {cost != null && (
-          <div className="flex items-center justify-between gap-3 text-sm">
-            <span className="text-muted">Total cost vs market</span>
-            <span className="term text-secondary">{cost.toFixed(2)}%</span>
+          <div className="flex items-center justify-between gap-3 py-2.5">
+            <dt className="text-muted">Total cost</dt>
+            <dd className="text-secondary tabular-nums">{cost.toFixed(2)}%</dd>
           </div>
         )}
         {zecTx && (
-          <div className="flex items-center justify-between gap-3 text-sm pt-1 border-t border-glass-4">
-            <span className="text-muted">Zcash transaction</span>
-            <TxLink href={`https://zecblock.com/tx/${zecTx}`} label={`${shortAddress(zecTx, 8, 6)} on ZecBlock`} />
+          <div className="flex items-center justify-between gap-3 py-2.5">
+            <dt className="text-muted">Transaction</dt>
+            <dd><TxLink href={`https://zecblock.com/tx/${zecTx}`} label={`${shortAddress(zecTx, 6, 6)} on ZecBlock`} /></dd>
           </div>
         )}
-      </div>
+      </dl>
 
-      {transparent ? (
-        <p className="px-4 py-3 rounded-2xl bg-cipher-orange/[0.06] border border-cipher-orange/25 text-sm text-secondary leading-relaxed">
-          This ZEC landed in a transparent address, which is publicly visible. Move it into the shielded pool from a
-          wallet like Zashi to make future spending private.
+      {transparent && (
+        <p className="text-sm text-cipher-orange leading-relaxed">
+          This landed in a transparent address, which is public. Move it to a shielded address in a wallet like Zashi.
         </p>
-      ) : (
-        <p className="text-sm text-secondary leading-relaxed">Your ZEC arrived at a shielded address. The amount entering the shielded pool is visible on chain; what you do with it from here is private.</p>
       )}
-      <div className="flex gap-2">
-        <Link href="/exposure" className="btn-secondary flex-1">Check your exposure</Link>
-        <Link href="/" className="btn-secondary flex-1">New swap</Link>
+      <div className="space-y-3">
+        <Link href="/" className="btn-primary text-center">New swap</Link>
+        <Link href="/exposure" className="block text-center text-[0.8125rem] text-muted hover:text-primary transition-colors">
+          Check your wallet&apos;s exposure →
+        </Link>
       </div>
     </div>
   );

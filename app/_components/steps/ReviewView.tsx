@@ -85,22 +85,22 @@ export function ReviewView({
           <TokenChainIcon token={t.token} chain={t.chain} size={24} />
           <div className="min-w-0 flex-1">
             <div className="text-xs text-muted">You send · {t.chainLabel}</div>
-            <div className="font-mono text-base text-primary tabular-nums truncate">
+            <div className="text-base text-primary tabular-nums truncate">
               {state.amount} <span className="text-secondary">{t.token}</span>
             </div>
           </div>
-          {q && <span className="term text-muted shrink-0">≈ {formatUsd(q.amountInUsd)}</span>}
+          {q && <span className="text-[0.8125rem] text-muted tabular-nums shrink-0">≈ {formatUsd(q.amountInUsd)}</span>}
         </div>
 
         <div className="px-4 pt-3.5 pb-4 border-t border-glass-4 bg-glass-2">
           <div className="text-xs text-muted">You receive (estimated)</div>
           <div className="mt-1.5 flex items-center gap-3">
             <TokenChainIcon token="zec" chain="zec" size={36} />
-            <div className="min-w-0 font-mono text-[2rem] leading-none tracking-tight text-primary tabular-nums truncate">
+            <div className="min-w-0 text-[2rem] font-medium leading-none tracking-tight text-primary tabular-nums truncate">
               {q ? formatZec(q.amountOutFormatted, 6) : '—'} <span className="text-secondary text-xl">ZEC</span>
             </div>
           </div>
-          <div className="mt-2 term text-muted">
+          <div className="mt-2 text-[0.8125rem] text-muted tabular-nums">
             {q ? `≈ ${formatUsd(q.amountOutUsd)}` : ''}
             {f ? ` · at least ${f.minOut} ZEC` : ''}
           </div>

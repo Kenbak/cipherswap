@@ -48,7 +48,7 @@ export function TokenPicker({ tokens, selected, loading, onSelect, open, onOpenC
         type="button"
         onClick={() => onOpenChange(true)}
         aria-haspopup="dialog"
-        className="shrink-0 flex items-center gap-2 pl-1.5 pr-2.5 py-1.5 rounded-md bg-glass-6 hover:bg-glass-12 border border-glass-8 transition-colors"
+        className="shrink-0 flex items-center gap-2 pl-1.5 pr-2.5 py-1.5 rounded-full bg-glass-6 hover:bg-glass-12 transition-colors"
       >
         <TokenChainIcon token={selected.token} chain={selected.chain} size={28} />
         <span className="text-left leading-tight">

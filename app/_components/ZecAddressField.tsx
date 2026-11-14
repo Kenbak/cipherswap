@@ -41,41 +41,43 @@ export function ZecAddressField({
   };
 
   return (
-    <div className="space-y-2">
-      <div className="flex items-center gap-2">
+    <div>
+      <div className="flex items-center gap-3">
+        <span className="w-14 shrink-0 text-[0.8125rem] text-muted">To</span>
         <input
           type="text"
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          placeholder="Your ZEC address (u1… recommended)"
+          placeholder="Your ZEC address"
           aria-label="ZEC receiving address"
           aria-invalid={!!(value && error)}
           aria-describedby="zec-addr-hint"
           spellCheck={false}
           autoComplete="off"
-          className="flex-1 min-w-0 bg-transparent text-primary font-mono text-sm placeholder:font-sans placeholder:text-muted focus:outline-none"
+          className="flex-1 min-w-0 bg-transparent text-primary font-mono text-base sm:text-sm placeholder:font-sans placeholder:text-muted/70 focus:outline-none truncate"
         />
         {!value && (
-          <button type="button" onClick={paste} className="shrink-0 px-2.5 py-1 rounded-lg text-xs font-medium text-cipher-gold bg-cipher-gold/10 hover:bg-cipher-gold/15 transition-colors">
+          <button type="button" onClick={paste} className="shrink-0 text-[0.8125rem] font-medium text-cipher-gold hover:opacity-80">
             Paste
           </button>
         )}
       </div>
-      <div id="zec-addr-hint" className="min-h-[1.25rem]">
-        {value && error ? (
-          <p className="text-xs text-danger">{error}</p>
-        ) : value ? (
-          <div className="space-y-1.5">
-            <ZecAddressBadge address={value} />
-            {kind === 'transparent' && (
-              <p className="text-xs text-muted leading-relaxed">
-                Anyone can see what arrives at a t-address. For privacy, receive to a unified address (u1…) from
-                Zashi, Zingo or YWallet.
-              </p>
-            )}
-          </div>
-        ) : null}
-      </div>
+      {value && (
+        <div id="zec-addr-hint" className="mt-1.5 pl-[4.25rem]">
+          {error ? (
+            <p className="text-xs text-danger">{error}</p>
+          ) : kind === 'transparent' ? (
+            <p className="text-xs text-cipher-orange leading-relaxed">
+              Transparent address: what arrives is public. Use a shielded u1… address for privacy.
+            </p>
+          ) : kind ? (
+            <p className="flex items-center gap-1.5 text-xs text-muted">
+              <span className="w-1.5 h-1.5 rounded-full bg-cipher-gold" aria-hidden />
+              Shielded {kind === 'unified' ? '· Orchard' : '· Sapling'}
+            </p>
+          ) : null}
+        </div>
+      )}
     </div>
   );
 }
