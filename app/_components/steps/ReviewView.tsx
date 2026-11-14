@@ -55,6 +55,7 @@ export function ReviewView({
     return () => clearInterval(id);
   }, []);
 
+  const highCost = f?.costPct != null && f.costPct > 3;
   const refreshIn = preview.fetchedAt ? Math.max(0, Math.ceil((preview.fetchedAt + refreshMs - now) / 1000)) : null;
 
   const confirmLabel =
@@ -70,52 +71,58 @@ export function ReviewView({
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between px-1">
         <button type="button" onClick={onBack} disabled={busy} className="text-sm text-muted hover:text-primary transition-colors disabled:opacity-40">
           ← Edit
         </button>
         <span className="term text-muted" aria-live="polite">
-          {preview.loading ? 'refreshing quote…' : refreshIn != null && !state.rateChanged ? `quote refreshes in ${refreshIn}s` : ''}
+          {state.rateChanged ? '' : preview.loading || refreshIn === 0 ? 'refreshing quote…' : refreshIn != null ? `quote refreshes in ${refreshIn}s` : ''}
         </span>
       </div>
 
-      <div className="panel px-4 py-3.5 space-y-3">
-        <div className="flex items-center gap-3">
-          <TokenChainIcon token={t.token} chain={t.chain} size={32} />
-          <div className="min-w-0">
-            <div className="text-xs text-muted">You send</div>
-            <div className="font-mono text-2xl text-primary tabular-nums truncate">
-              {state.amount} <span className="text-secondary text-lg">{t.token}</span>
+      <div className="panel overflow-hidden">
+        <div className="px-4 pt-3.5 pb-3 flex items-center gap-3">
+          <TokenChainIcon token={t.token} chain={t.chain} size={24} />
+          <div className="min-w-0 flex-1">
+            <div className="text-xs text-muted">You send · {t.chainLabel}</div>
+            <div className="font-mono text-base text-primary tabular-nums truncate">
+              {state.amount} <span className="text-secondary">{t.token}</span>
             </div>
-            <div className="text-xs text-muted">on {t.chainLabel}{q ? ` · ≈ ${formatUsd(q.amountInUsd)}` : ''}</div>
+          </div>
+          {q && <span className="term text-muted shrink-0">≈ {formatUsd(q.amountInUsd)}</span>}
+        </div>
+
+        <div className="px-4 pt-3.5 pb-4 border-t border-glass-4 bg-glass-2">
+          <div className="text-xs text-muted">You receive (estimated)</div>
+          <div className="mt-1.5 flex items-center gap-3">
+            <TokenChainIcon token="zec" chain="zec" size={36} />
+            <div className="min-w-0 font-mono text-[2rem] leading-none tracking-tight text-primary tabular-nums truncate">
+              {q ? formatZec(q.amountOutFormatted, 6) : '—'} <span className="text-secondary text-xl">ZEC</span>
+            </div>
+          </div>
+          <div className="mt-2 term text-muted">
+            {q ? `≈ ${formatUsd(q.amountOutUsd)}` : ''}
+            {f ? ` · at least ${f.minOut} ZEC` : ''}
           </div>
         </div>
-        <div className="flex items-center gap-3">
-          <TokenChainIcon token="zec" chain="zec" size={32} />
-          <div className="min-w-0">
-            <div className="text-xs text-muted">You receive (estimated)</div>
-            <div className="font-mono text-2xl text-primary tabular-nums truncate">
-              {q ? formatZec(q.amountOutFormatted, 6) : '—'} <span className="text-secondary text-lg">ZEC</span>
-            </div>
-            <div className="text-xs text-muted">{q ? `≈ ${formatUsd(q.amountOutUsd)}` : ''}</div>
-          </div>
-        </div>
+
         {f && (
-          <dl className="grid grid-cols-3 gap-2 pt-3 border-t border-glass-4">
-            <div>
-              <dt className="text-xs text-muted">Minimum</dt>
-              <dd className="term !text-[0.8125rem] text-secondary">{f.minOut} ZEC</dd>
-            </div>
+          <dl className="px-4 py-3 border-t border-glass-4 grid grid-cols-2 gap-3">
             <div>
               <dt className="text-xs text-muted">Total cost</dt>
-              <dd className={`term !text-[0.8125rem] ${f.costPct != null && f.costPct > 3 ? 'text-cipher-orange' : 'text-secondary'}`}>
+              <dd className={`term !text-[0.8125rem] ${highCost ? 'text-cipher-orange' : 'text-secondary'}`}>
                 {f.costPct != null ? `${f.costPct.toFixed(2)}%` : '—'}
               </dd>
             </div>
             <div>
-              <dt className="text-xs text-muted">Time</dt>
+              <dt className="text-xs text-muted">Arrives in</dt>
               <dd className="term !text-[0.8125rem] text-secondary">{f.eta}</dd>
             </div>
+            {highCost && (
+              <p className="col-span-2 text-xs text-muted leading-relaxed">
+                Network and solver fees are mostly fixed, so they weigh more on small swaps. A larger amount costs less in percent.
+              </p>
+            )}
           </dl>
         )}
       </div>

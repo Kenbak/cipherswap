@@ -1,10 +1,11 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { DetectedWallet, UseWalletReturn } from '@/hooks/useWallet';
 import { chainToWalletType } from '@/hooks/useWallet';
 import { getLastWallet } from '@/lib/swap-history';
 import { shortAddress } from '@/lib/deposit';
+import { getChainIcon } from '@/components/TokenChainIcon';
 import { Modal, Spinner, CopyButton } from './ui';
 
 type WalletFamily = NonNullable<DetectedWallet['type']>;
@@ -16,23 +17,125 @@ const FAMILY_LABEL: Record<WalletFamily, string> = {
   tron: 'Tron',
 };
 
+type WalletGroup = { family: WalletFamily; wallets: DetectedWallet[]; isLast: (w: DetectedWallet) => boolean };
+
 const FAMILY_ORDER: WalletFamily[] = ['evm', 'solana', 'bitcoin', 'tron'];
 
-export function WalletIcon({ wallet: w, size = 24 }: { wallet: DetectedWallet; size?: number }) {
-  const fallback: Record<string, string> = {
-    evm: '/chains/eth.png', solana: '/chains/sol.png', bitcoin: '/chains/btc.png', tron: '/chains/tron.png',
-  };
-  const src = w.icon || fallback[w.type || ''];
-  if (src) {
-    // eslint-disable-next-line @next/next/no-img-element
-    return <img src={src} alt="" className="rounded-lg shrink-0" style={{ width: size, height: size }} />;
-  }
+/** Chain logos shown next to each wallet family. EVM lists a few of the chains it covers. */
+const FAMILY_CHAINS: Record<WalletFamily, string[]> = {
+  evm: ['eth', 'base', 'arb', 'bsc'],
+  solana: ['sol'],
+  bitcoin: ['btc'],
+  tron: ['tron'],
+};
+
+const FAMILY_FALLBACK_ICON: Record<WalletFamily, string> = {
+  evm: '/chains/eth.png', solana: '/chains/sol.png', bitcoin: '/chains/btc.png', tron: '/chains/tron.png',
+};
+
+function ChainStack({ family, size = 16 }: { family: WalletFamily; size?: number }) {
   return (
-    <div
-      className="rounded-lg bg-glass-8 flex items-center justify-center text-primary font-semibold shrink-0"
-      style={{ width: size, height: size, fontSize: size * 0.45 }}
+    <span className="flex items-center" aria-hidden>
+      {FAMILY_CHAINS[family].map((c, i) => {
+        const src = getChainIcon(c);
+        return src ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            key={c}
+            src={src}
+            alt=""
+            className="rounded-full ring-2 ring-[var(--color-surface-solid)]"
+            style={{ width: size, height: size, marginLeft: i ? -size * 0.3 : 0 }}
+          />
+        ) : null;
+      })}
+    </span>
+  );
+}
+
+/** Wallet logo with a small badge for the chain family it signs for, so Phantom (EVM) and Phantom (Solana) read differently. */
+export function WalletIcon({ wallet: w, size = 24, badge = true }: { wallet: DetectedWallet; size?: number; badge?: boolean }) {
+  const family = w.type as WalletFamily | null;
+  const src = w.icon || (family ? FAMILY_FALLBACK_ICON[family] : undefined);
+  const badgeSrc = family ? getChainIcon(FAMILY_CHAINS[family][0]) : null;
+  const badgeSize = Math.max(10, Math.round(size * 0.42));
+  const showBadge = badge && badgeSrc && src !== badgeSrc;
+  return (
+    <span className="relative inline-flex shrink-0" style={{ width: size, height: size }}>
+      {src ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={src} alt="" className="rounded-lg" style={{ width: size, height: size }} />
+      ) : (
+        <span
+          className="rounded-lg bg-glass-8 flex items-center justify-center text-primary font-semibold"
+          style={{ width: size, height: size, fontSize: size * 0.45 }}
+        >
+          {w.name.charAt(0).toUpperCase()}
+        </span>
+      )}
+      {showBadge && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={badgeSrc}
+          alt=""
+          className="absolute rounded-full ring-2 ring-[var(--color-surface-solid)]"
+          style={{ width: badgeSize, height: badgeSize, right: -3, bottom: -3 }}
+        />
+      )}
+    </span>
+  );
+}
+
+function WalletRow({
+  w, lastUsed, disabled, switching, onConnect,
+}: {
+  w: DetectedWallet; lastUsed: boolean; disabled: boolean; switching: boolean; onConnect: (w: DetectedWallet) => void;
+}) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={() => onConnect(w)}
+      className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-colors hover:bg-glass-6 disabled:opacity-50"
     >
-      {w.name.charAt(0).toUpperCase()}
+      <WalletIcon wallet={w} size={32} />
+      <span className="flex-1 min-w-0 text-sm font-medium text-primary truncate">{w.name}</span>
+      {lastUsed && <span className="text-[0.6875rem] text-muted">Last used</span>}
+      {switching && <Spinner className="w-3.5 h-3.5" />}
+    </button>
+  );
+}
+
+function OtherNetworks({
+  groups,
+  renderGroup,
+}: {
+  groups: WalletGroup[];
+  renderGroup: (g: WalletGroup) => ReactNode;
+}) {
+  // Lives inside the modal, which unmounts on close, so it starts collapsed every time.
+  const [open, setOpen] = useState(false);
+  const count = groups.reduce((n, g) => n + g.wallets.length, 0);
+  return (
+    <div className="space-y-4">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className="w-full flex items-center justify-between gap-2 px-3 py-1.5 rounded-lg text-xs text-muted hover:text-primary transition-colors"
+      >
+        <span>Other networks · {count} wallet{count === 1 ? '' : 's'}</span>
+        <span className="flex items-center gap-2">
+          {!open && groups.map((g) => <ChainStack key={g.family} family={g.family} size={14} />)}
+          <span aria-hidden className={`transition-transform ${open ? 'rotate-90' : ''}`}>›</span>
+        </span>
+      </button>
+      {open && (
+        <>
+          <p className="px-3 -mt-2 text-xs text-muted">Connecting one switches the token you send to that network.</p>
+          {groups.map(renderGroup)}
+        </>
+      )}
     </div>
   );
 }
@@ -57,8 +160,9 @@ export function WalletModal({
   error: string;
 }) {
   const needed = chainToWalletType(chain);
-  const lastUsed = open ? getLastWallet() : null;
-
+  const last = open ? getLastWallet() : null;
+  const lastName = last?.name ?? null;
+  const lastType = (last?.type ?? null) as WalletFamily | null;
   const groups = useMemo(() => {
     const byFamily = new Map<WalletFamily, DetectedWallet[]>();
     for (const w of wallet.allWallets) {
@@ -67,24 +171,55 @@ export function WalletModal({
       list.push(w);
       byFamily.set(w.type, list);
     }
+    // Older saves have no chain type; credit the name to the family being sent from, else the first one listing it.
+    const lastFamily = lastName
+      ? lastType
+        ?? (needed && byFamily.get(needed)?.some((w) => w.name === lastName) ? needed : null)
+        ?? FAMILY_ORDER.find((f) => byFamily.get(f)?.some((w) => w.name === lastName))
+        ?? null
+      : null;
+    const isLast = (w: DetectedWallet) => !!lastName && w.name === lastName && w.type === lastFamily;
     const order = [...FAMILY_ORDER].sort((a, b) => (a === needed ? -1 : b === needed ? 1 : 0));
     return order
       .filter((f) => byFamily.has(f))
       .map((f) => ({
         family: f,
-        wallets: [...byFamily.get(f)!].sort((a, b) => (a.name === lastUsed ? -1 : b.name === lastUsed ? 1 : 0)),
+        wallets: [...byFamily.get(f)!].sort((a, b) => Number(isLast(b)) - Number(isLast(a))),
+        isLast,
       }));
-  }, [wallet.allWallets, needed, lastUsed]);
+  }, [wallet.allWallets, needed, lastName, lastType]);
 
   const noWallets = wallet.allWallets.length === 0;
+  const primary = needed ? groups.filter((g) => g.family === needed) : groups;
+  const others = needed ? groups.filter((g) => g.family !== needed) : [];
+
+  const renderGroup = ({ family, wallets, isLast }: WalletGroup) => (
+    <section key={family} aria-label={FAMILY_LABEL[family]}>
+      <div className="px-3 pb-1.5 flex items-center gap-2">
+        <ChainStack family={family} size={14} />
+        <h3 className="text-xs font-medium text-muted">{FAMILY_LABEL[family]}</h3>
+      </div>
+      <div className="space-y-0.5">
+        {wallets.map((w) => (
+          <WalletRow
+            key={`${w.providerKey}-${w.type}`}
+            w={w}
+            lastUsed={isLast(w)}
+            disabled={wallet.switching}
+            switching={wallet.switching}
+            onConnect={onConnect}
+          />
+        ))}
+      </div>
+    </section>
+  );
 
   return (
     <Modal open={open} onClose={onClose} title="Connect a wallet">
       <div className="space-y-4">
         {needed ? (
           <p className="px-2 text-sm text-secondary">
-            You&apos;re sending from <span className="text-primary">{chainLabel}</span>. Wallets that can sign
-            for it are listed first.
+            Sending from <span className="text-primary">{chainLabel}</span>. These wallets can sign it.
           </p>
         ) : (
           <p className="px-2 text-sm text-secondary">
@@ -101,35 +236,16 @@ export function WalletModal({
           </div>
         )}
 
-        {groups.map(({ family, wallets }) => {
-          const compatible = !needed || family === needed;
-          return (
-            <section key={family} aria-label={FAMILY_LABEL[family]}>
-              <div className="px-2 pb-1.5 flex items-center justify-between">
-                <h3 className="text-xs font-medium text-muted">{FAMILY_LABEL[family]}</h3>
-                {family === needed && <span className="text-xs text-cipher-gold">Matches {chainLabel}</span>}
-              </div>
-              <div className="space-y-1">
-                {wallets.map((w) => (
-                  <button
-                    key={`${w.providerKey}-${w.type}`}
-                    type="button"
-                    disabled={wallet.switching}
-                    onClick={() => onConnect(w)}
-                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-colors disabled:opacity-50 ${
-                      compatible ? 'hover:bg-glass-6' : 'opacity-60 hover:opacity-100 hover:bg-glass-4'
-                    }`}
-                  >
-                    <WalletIcon wallet={w} size={32} />
-                    <span className="flex-1 min-w-0 text-sm font-medium text-primary truncate">{w.name}</span>
-                    {w.name === lastUsed && <span className="chip !py-0 !text-[0.6875rem]">Last used</span>}
-                    {wallet.switching && <Spinner className="w-3.5 h-3.5" />}
-                  </button>
-                ))}
-              </div>
-            </section>
-          );
-        })}
+        {needed && !noWallets && primary.length === 0 && (
+          <p className="mx-2 panel px-4 py-3 text-sm text-secondary">
+            No {chainLabel} wallet detected in this browser. Send manually, or connect a wallet for another network
+            and CipherSwap switches the token to match.
+          </p>
+        )}
+
+        {primary.map(renderGroup)}
+
+        {others.length > 0 && <OtherNetworks groups={others} renderGroup={renderGroup} />}
 
         {error && (
           <p role="alert" className="mx-2 px-3 py-2 rounded-lg bg-danger/[0.06] border border-danger/20 text-sm text-danger">
@@ -181,6 +297,8 @@ export function WalletButton({
     return () => document.removeEventListener('mousedown', handler);
   }, [menu]);
 
+  const connectedWallet = wallet.allWallets.find((w) => w.name === wallet.walletName && w.type === wallet.walletType);
+
   if (!wallet.connected || !wallet.address) {
     return (
       <button
@@ -202,7 +320,11 @@ export function WalletButton({
         aria-expanded={menu}
         className="flex items-center gap-2 pl-2.5 pr-3 py-1.5 rounded-md bg-glass-4 hover:bg-glass-8 transition-colors"
       >
-        <span className="w-1.5 h-1.5 bg-cipher-green" aria-hidden />
+        {connectedWallet ? (
+          <WalletIcon wallet={connectedWallet} size={18} />
+        ) : (
+          <span className="w-1.5 h-1.5 bg-cipher-green" aria-hidden />
+        )}
         <span className="text-sm text-secondary hidden sm:inline">{wallet.walletName}</span>
         <span className="term text-primary">{shortAddress(wallet.address, 4, 4)}</span>
       </button>

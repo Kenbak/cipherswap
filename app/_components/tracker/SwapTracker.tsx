@@ -44,9 +44,10 @@ function statusDetail(s: StatusResponse): string | undefined {
   return undefined;
 }
 
-function ProgressRail({ status }: { status: SwapStatus | null }) {
+function ProgressRail({ status, sent }: { status: SwapStatus | null; sent: boolean }) {
   const meta = status ? STATUS_META[status] : null;
-  const current = meta?.step ?? 0;
+  // A wallet broadcast completes the deposit step before NEAR Intents reports it.
+  const current = Math.max(meta?.step ?? 0, sent ? 1 : 0);
   const terminalTone = meta && meta.step === 3 ? meta.tone : null;
   return (
     <ol className="grid grid-cols-4 gap-1.5" aria-label="Swap progress">
@@ -164,13 +165,15 @@ export function SwapTracker({ depositAddress, memo }: { depositAddress: string; 
   const txHash = record?.txHash;
   const originExplorer = asset ? CHAIN_EXPLORERS[asset.chain] : undefined;
 
+  const recordLog = record?.log;
   const lines: SwapLogEntry[] = useMemo(() => {
-    if (record?.log.length) return record.log;
+    // Entries are appended as they are observed; status times come from NEAR Intents, so order by time.
+    if (recordLog?.length) return [...recordLog].sort((a, b) => a.at - b.at);
     const out: SwapLogEntry[] = [];
     if (qr) out.push({ at: Date.parse(qr.timestamp), code: 'quote_signed', detail: shortAddress(depositAddress, 8, 6) });
     if (s) out.push({ at: Date.parse(s.updatedAt), code: STATUS_META[s.status].code, detail: statusDetail(s) });
     return out;
-  }, [record?.log, qr, s, depositAddress]);
+  }, [recordLog, qr, s, depositAddress]);
 
   const liveLine = status.connectionError
     ? `status_check_failed  retrying in ${Math.max(0, Math.ceil(((status.nextRetryAt ?? now) - now) / 1000))}s`
@@ -229,7 +232,7 @@ export function SwapTracker({ depositAddress, memo }: { depositAddress: string; 
           ) : null}
         </div>
 
-        <ProgressRail status={current} />
+        <ProgressRail status={current} sent={!!txHash && (!current || current === 'PENDING_DEPOSIT')} />
 
         {asset && (
           <div className="flex items-center justify-between gap-3 panel px-4 py-3">

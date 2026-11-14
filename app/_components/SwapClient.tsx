@@ -112,7 +112,7 @@ export default function SwapClient({ initialTokens }: { initialTokens?: SourceTo
     try {
       const ok = await wallet.connect(w);
       if (!ok) return;
-      setLastWallet(w.name);
+      setLastWallet(w.name, w.type ?? '');
       setWalletModal(false);
       dispatch({ type: 'set_manual', manual: false });
       if (chainToWalletType(t.chain) !== w.type) {

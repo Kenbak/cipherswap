@@ -129,13 +129,17 @@ export function removeSwap(depositAddress: string) {
   write(read().filter((r) => r.depositAddress !== depositAddress));
 }
 
-export function getLastWallet(): string | null {
+/** Last connected wallet as `{ name, type }`; older entries stored the name only. */
+export function getLastWallet(): { name: string; type: string | null } | null {
   if (typeof window === 'undefined') return null;
-  return localStorage.getItem(LAST_WALLET_KEY);
+  const raw = localStorage.getItem(LAST_WALLET_KEY);
+  if (!raw) return null;
+  const sep = raw.indexOf(':');
+  return sep > 0 ? { type: raw.slice(0, sep), name: raw.slice(sep + 1) } : { name: raw, type: null };
 }
 
-export function setLastWallet(name: string) {
-  localStorage.setItem(LAST_WALLET_KEY, name);
+export function setLastWallet(name: string, type: string) {
+  localStorage.setItem(LAST_WALLET_KEY, `${type}:${name}`);
 }
 
 /** Removes everything CipherSwap keeps in this browser. */

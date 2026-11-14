@@ -14,7 +14,7 @@ function compactUsd(n: number): string {
 
 export function SwapHero({ stats }: { stats: NetworkStats | null }) {
   return (
-    <div className="max-w-xl lg:pt-4">
+    <div className="max-w-xl">
       <p className="eyebrow">cross-chain → shielded zcash</p>
       <h1 className="mt-3 font-mono font-bold text-primary tracking-tight leading-[1.05] text-[2rem] sm:text-5xl">
         Buy <span className="text-cipher-gold">ZEC</span> from any chain.

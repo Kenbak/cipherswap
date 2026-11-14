@@ -50,7 +50,7 @@ export default async function SwapPage() {
 
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 min-h-[calc(100dvh-var(--nav-height))] flex items-center py-6 sm:py-8">
-      <div className="w-full grid gap-6 lg:gap-12 lg:grid-cols-[1fr_480px] items-start">
+      <div className="w-full grid gap-6 lg:gap-12 lg:grid-cols-[1fr_480px] items-start lg:items-center">
         <SwapHero stats={stats} />
         <Suspense fallback={<SwapSkeleton />}>
           <SwapClient initialTokens={initialTokens.length > 0 ? initialTokens : undefined} />

@@ -37,7 +37,7 @@ function getTokenIcon(symbol: string): string | null {
 }
 
 // Chain icons from /public/chains/ (sourced from zipher-app)
-function getChainIcon(chain: string): string | null {
+export function getChainIcon(chain: string): string | null {
   const key = chain.toLowerCase();
   const map: Record<string, string> = {
     eth: '/chains/eth.png',
@@ -131,7 +131,7 @@ export function TokenChainIcon({ token, chain, size = 32, className = '' }: Toke
 
       {showBadge && chainUrl && (
         <div
-          className="absolute -bottom-0.5 -right-0.5 rounded-full bg-cipher-surface dark:bg-[#1a1a2e] p-[2px]"
+          className="absolute -bottom-0.5 -right-0.5 rounded-full bg-[var(--color-surface-solid)] p-[2px]"
           style={{ width: badgeSize + 4, height: badgeSize + 4 }}
         >
           <img
