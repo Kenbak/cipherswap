@@ -39,7 +39,7 @@ export function Navbar() {
             <span className="text-muted hidden sm:inline">ZEC</span>
             <span className="text-primary">${price.toFixed(2)}</span>
             {change24h != null && (
-              <span className={change24h >= 0 ? 'text-cipher-green' : 'text-cipher-orange'}>
+              <span className={`hidden sm:inline ${change24h >= 0 ? 'text-cipher-green' : 'text-cipher-orange'}`}>
                 {change24h >= 0 ? '+' : '−'}{Math.abs(change24h).toFixed(1)}%
               </span>
             )}

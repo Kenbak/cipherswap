@@ -12,46 +12,55 @@ function compactUsd(n: number): string {
   return n.toLocaleString('en-US', { style: 'currency', currency: 'USD', notation: 'compact', maximumFractionDigits: 1 });
 }
 
-export function SwapHero({ stats }: { stats: NetworkStats | null }) {
+/** Short centered title above the swap card. The card itself is the page's focus. */
+export function SwapHeadline() {
   return (
-    <div className="max-w-xl lg:pt-4">
-      <p className="eyebrow">cross-chain → shielded zcash</p>
-      <h1 className="mt-3 font-mono font-bold text-primary tracking-tight leading-[1.05] text-[2rem] sm:text-5xl">
+    <header className="text-center min-w-0">
+      <h1 className="font-medium text-primary tracking-[-0.035em] leading-[1.05] text-[2rem] sm:text-[2.75rem] text-balance">
         Buy <span className="text-cipher-gold">ZEC</span> from any chain.
       </h1>
-      <p className="mt-4 text-base sm:text-lg text-secondary">Swap from 15+ chains into shielded Zcash.</p>
+      <p className="mt-3 text-[0.9375rem] sm:text-base text-secondary">Swap from 15+ chains into shielded Zcash.</p>
+    </header>
+  );
+}
 
-      <ul className="mt-6 flex flex-wrap gap-x-5 gap-y-2">
-        {CLAIMS.map((c) => (
-          <li key={c} className="flex items-center gap-2 text-sm text-primary">
-            <span className="w-1.5 h-1.5 bg-cipher-gold" aria-hidden />
+/** Quiet facts under the swap card: claims, network stats and a link to the explainer. */
+export function SwapFacts({ stats }: { stats: NetworkStats | null }) {
+  return (
+    <footer className="text-center min-w-0 space-y-4">
+      <p className="text-sm text-muted flex flex-wrap justify-center gap-x-2">
+        {CLAIMS.map((c, i) => (
+          <span key={c} className="whitespace-nowrap">
             {c}
-          </li>
+            {i < CLAIMS.length - 1 && <span aria-hidden className="ml-2">·</span>}
+          </span>
         ))}
-      </ul>
-      <Link href="/how-it-works" className="mt-3 inline-block text-sm text-muted hover:text-primary transition-colors">
-        How it works →
-      </Link>
+      </p>
 
       {stats && (
-        <dl className="mt-10 hidden sm:flex gap-x-10" title="All ZEC cross-chain swaps through NEAR Intents, not only CipherSwap">
-          {[
-            { k: '24h volume', v: compactUsd(stats.volume24h) },
-            { k: '24h swaps', v: stats.swaps24h.toLocaleString('en-US') },
-            { k: 'all-time', v: stats.swapsAllTime.toLocaleString('en-US') },
-          ].map((s) => (
-            <div key={s.k}>
-              <dt className="term text-muted">{s.k}</dt>
-              <dd className="term !text-lg text-primary">{s.v}</dd>
-            </div>
-          ))}
-          <div className="self-end pb-1">
-            <a href="https://zecblock.com/crosschain" target="_blank" rel="noopener noreferrer" className="term text-muted hover:text-primary">
-              NEAR Intents · ZecBlock ↗
-            </a>
-          </div>
-        </dl>
+        <a
+          href="https://zecblock.com/crosschain"
+          target="_blank"
+          rel="noopener noreferrer"
+          title="All ZEC cross-chain swaps through NEAR Intents, not only CipherSwap. Data from ZecBlock."
+          className="term inline-flex flex-wrap justify-center gap-x-4 gap-y-1 text-muted hover:text-secondary transition-colors"
+        >
+          <span>{compactUsd(stats.volume24h)} 24h volume</span>
+          <span aria-hidden>·</span>
+          <span>{stats.swaps24h.toLocaleString('en-US')} swaps in 24h</span>
+          <span aria-hidden className="hidden sm:inline">·</span>
+          <span className="hidden sm:inline">via NEAR Intents ↗</span>
+        </a>
       )}
-    </div>
+
+      <div className="flex justify-center gap-5 text-sm">
+        <Link href="/how-it-works" className="text-secondary hover:text-primary transition-colors">
+          How it works
+        </Link>
+        <Link href="/how-it-works#privacy" className="text-secondary hover:text-primary transition-colors">
+          What we know about you
+        </Link>
+      </div>
+    </footer>
   );
 }

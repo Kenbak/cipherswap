@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useWallet, chainToWalletType, type DetectedWallet } from '@/hooks/useWallet';
@@ -112,7 +111,7 @@ export default function SwapClient({ initialTokens }: { initialTokens?: SourceTo
     try {
       const ok = await wallet.connect(w);
       if (!ok) return;
-      setLastWallet(w.name);
+      setLastWallet(w.name, w.type ?? '');
       setWalletModal(false);
       dispatch({ type: 'set_manual', manual: false });
       if (chainToWalletType(t.chain) !== w.type) {
@@ -205,12 +204,12 @@ export default function SwapClient({ initialTokens }: { initialTokens?: SourceTo
   };
 
   return (
-    <div className="w-full max-w-[480px] mx-auto space-y-3">
+    <div className="w-full min-w-0 max-w-[480px] mx-auto space-y-3">
       <RecentSwaps />
 
-      <div className="swap-card p-2 sm:p-2.5">
-        <div className="flex items-center justify-between px-2.5 pt-1.5 pb-2.5">
-          <h2 className="eyebrow">{reviewing ? 'review swap' : 'swap to zec'}</h2>
+      <div className="swap-card overflow-hidden">
+        <div className="flex items-center justify-between px-5 pt-4">
+          <h2 className="text-[0.9375rem] font-semibold text-primary">{reviewing ? 'Review' : 'Swap'}</h2>
           <WalletButton
             wallet={wallet}
             onOpen={() => { setWalletError(''); setWalletModal(true); }}
@@ -247,7 +246,7 @@ export default function SwapClient({ initialTokens }: { initialTokens?: SourceTo
               />
             </motion.div>
           ) : (
-            <motion.div key="review" {...fade}>
+            <motion.div key="review" {...fade} className="px-3 sm:px-4 pt-3 pb-4">
               <ReviewView
                 state={state}
                 preview={preview}
@@ -262,11 +261,6 @@ export default function SwapClient({ initialTokens }: { initialTokens?: SourceTo
           )}
         </AnimatePresence>
 
-        <div className="mt-2.5 px-2.5 pb-1 text-right">
-          <Link href="/how-it-works#privacy" className="text-xs text-muted hover:text-primary transition-colors">
-            What we know about you →
-          </Link>
-        </div>
       </div>
 
       <WalletModal

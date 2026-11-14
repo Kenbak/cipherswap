@@ -4,7 +4,7 @@ import type { RefObject } from 'react';
 import { TokenChainIcon } from '@/components/TokenChainIcon';
 import type { SwapState } from '@/hooks/useSwapMachine';
 import type { QuoteResponse } from '@/lib/near-intents';
-import { formatUsd, formatZec, fromSmallestUnit, isPositiveAmount, toSmallestUnit } from '@/lib/amount';
+import { formatUsd, formatZec, isPositiveAmount, toSmallestUnit } from '@/lib/amount';
 import { TokenPicker } from '../TokenPicker';
 import { ZecAddressField } from '../ZecAddressField';
 import { PriceDetails } from '../PriceDetails';
@@ -79,33 +79,28 @@ export function EditView(props: EditViewProps) {
   const refundError = state.refundAddress ? validateRefundAddress(t.chain, state.refundAddress) : null;
   const { label, action } = cta(props);
 
+  const chipsShown = !!recommendations && !state.amount;
+  const zecError = state.zecAddress ? validateZecAddress(state.zecAddress) : null;
+
   return (
-    <div className="space-y-1">
-      {/* You send */}
-      <div className="panel px-4 pt-3 pb-3.5">
-        <div className="flex items-center justify-between gap-2 text-sm">
-          <label htmlFor="amount" className="text-secondary">You send</label>
+    <div>
+      {/* Pay */}
+      <section className="px-5 pt-4 pb-5">
+        <div className="flex items-center justify-between gap-2 h-5">
+          <label htmlFor="amount" className="text-[0.8125rem] text-muted">You pay</label>
           {sendMode === 'wallet' && (
-            <div className="flex items-center gap-1.5 text-xs">
-              {balanceLoading ? (
-                <span className="text-muted animate-pulse">Reading balance…</span>
-              ) : balance != null ? (
-                <>
-                  <span className="text-muted">Balance</span>
-                  <span className="term text-secondary">{formatWalletBalance(balance)}</span>
-                  {balanceNum! > 0 && (
-                    <>
-                      <button type="button" onClick={() => onSetAmount(fromSmallestUnit((toSmallestUnit(balance, t.decimals) ?? BigInt(0)) / BigInt(2), t.decimals))} className="ml-1 px-1.5 py-0.5 rounded-md text-cipher-gold hover:bg-cipher-gold/10 transition-colors">
-                        Half
-                      </button>
-                      <button type="button" onClick={() => onSetAmount(balance)} className="px-1.5 py-0.5 rounded-md text-cipher-gold hover:bg-cipher-gold/10 transition-colors">
-                        Max
-                      </button>
-                    </>
-                  )}
-                </>
-              ) : null}
-            </div>
+            balanceLoading ? (
+              <span className="text-xs text-muted animate-pulse">Reading balance…</span>
+            ) : balance != null ? (
+              <span className="flex items-center gap-2 text-xs text-muted">
+                <span className="tabular-nums">{formatWalletBalance(balance)} {t.token}</span>
+                {balanceNum! > 0 && (
+                  <button type="button" onClick={() => onSetAmount(balance)} className="font-medium text-cipher-gold hover:opacity-80">
+                    Max
+                  </button>
+                )}
+              </span>
+            ) : null
           )}
         </div>
         <div className="mt-2 flex items-center gap-3">
@@ -121,7 +116,7 @@ export function EditView(props: EditViewProps) {
               if (v === '' || /^\d*\.?\d*$/.test(v)) onSetAmount(v);
             }}
             placeholder="0"
-            className="flex-1 min-w-0 bg-transparent text-primary font-mono text-[2.25rem] leading-none tracking-tight placeholder:text-muted/40 focus:outline-none tabular-nums"
+            className="flex-1 min-w-0 bg-transparent text-primary text-[2.5rem] font-medium leading-none tracking-tight placeholder:text-muted/30 focus:outline-none tabular-nums"
           />
           <TokenPicker
             tokens={tokens}
@@ -132,87 +127,92 @@ export function EditView(props: EditViewProps) {
             onOpenChange={onPickerOpenChange}
           />
         </div>
-        <div className="mt-1.5 h-4 term text-muted">{inUsd ? `≈ ${inUsd}` : ''}</div>
-      </div>
+        <div className="mt-2 h-4 text-[0.8125rem] text-muted tabular-nums">{inUsd ? `≈ ${inUsd}` : ''}</div>
+        {chipsShown && (
+          <div className="mt-3">
+            <PrivacyAmountChips
+              recommendations={recommendations!}
+              selectedToken={t}
+              currentAmount={state.amount}
+              onSelect={onSetAmount}
+            />
+          </div>
+        )}
+      </section>
 
-      {recommendations && (
-        <div className="py-1.5">
-          <PrivacyAmountChips
-            recommendations={recommendations}
-            selectedToken={t}
-            currentAmount={state.amount}
-            onSelect={onSetAmount}
-          />
-        </div>
-      )}
-
-      {/* You receive */}
-      <div className="panel px-4 pt-3 pb-3">
-        <div className="flex items-center justify-between gap-2 text-sm">
-          <span className="text-secondary">You receive</span>
-          <span className="text-xs text-muted">Zcash</span>
-        </div>
+      {/* Receive */}
+      <section className="relative px-5 pt-5 pb-5 border-t border-glass-6">
+        <span
+          className="absolute left-1/2 -top-3.5 -translate-x-1/2 w-7 h-7 flex items-center justify-center rounded-full bg-[var(--color-surface-solid)] border border-glass-8 text-muted text-sm"
+          aria-hidden
+        >
+          ↓
+        </span>
+        <div className="text-[0.8125rem] text-muted h-5">You get</div>
         <div className="mt-2 flex items-center gap-3">
-          <div className="flex-1 min-w-0 font-mono text-[2.25rem] leading-none tracking-tight tabular-nums truncate">
+          <div className="flex-1 min-w-0 text-[2.5rem] font-medium leading-none tracking-tight tabular-nums truncate">
             {preview.loading && !q ? (
-              <span className="inline-flex items-center gap-2 text-muted text-base font-sans"><Spinner /> Finding best route…</span>
+              <span className="inline-flex items-center gap-2 text-muted text-base font-normal"><Spinner /> Finding a price…</span>
             ) : q ? (
               <span className={preview.loading ? 'text-primary/60' : 'text-primary'}>{formatZec(q.amountOutFormatted)}</span>
             ) : (
-              <span className="text-muted/40">0</span>
+              <span className="text-muted/30">0</span>
             )}
           </div>
-          <span className="shrink-0 flex items-center gap-2 pl-1.5 pr-3 py-1.5 rounded-md border border-glass-8">
-            <TokenChainIcon token="zec" chain="zec" size={28} />
+          <span className="shrink-0 flex items-center gap-2 pr-1">
+            <TokenChainIcon token="zec" chain="zec" size={24} />
             <span className="text-base font-semibold text-primary">ZEC</span>
           </span>
         </div>
-        <div className="mt-1.5 h-4 term text-muted">{q ? `≈ ${formatUsd(q.amountOutUsd)}` : ''}</div>
+        <div className="mt-2 h-4 text-[0.8125rem] text-muted tabular-nums">{q ? `≈ ${formatUsd(q.amountOutUsd)}` : ''}</div>
         {preview.error && !preview.loading && (
           <p role="alert" className="mt-2 text-sm text-cipher-orange">{preview.error}</p>
         )}
-        <div className="mt-3 pt-3 border-t border-glass-4">
-          <ZecAddressField value={state.zecAddress} onChange={onSetZecAddr} />
-        </div>
-      </div>
+      </section>
+
+      {/* Destination */}
+      <section className="px-5 py-3.5 border-t border-glass-6">
+        <ZecAddressField value={state.zecAddress} onChange={onSetZecAddr} />
+      </section>
 
       {sendMode === 'manual' && (
-        <div className="panel px-4 py-3 mt-1">
-          <div className="flex items-center justify-between gap-2">
-            <label htmlFor="refund" className="text-sm text-secondary">Refund address on {t.chainLabel}</label>
-            <button type="button" onClick={onUseWallet} className="text-xs text-cipher-gold hover:underline">
-              Use a wallet instead
-            </button>
+        <section className="px-5 py-3.5 border-t border-glass-6">
+          <div className="flex items-center gap-3">
+            <label htmlFor="refund" className="w-14 shrink-0 text-[0.8125rem] text-muted">Refund</label>
+            <input
+              id="refund"
+              type="text"
+              value={state.refundAddress}
+              onChange={(e) => onSetRefundAddr(e.target.value)}
+              placeholder={`Your ${t.chainLabel} address`}
+              spellCheck={false}
+              autoComplete="off"
+              aria-invalid={!!refundError}
+              aria-describedby="refund-hint"
+              className="flex-1 min-w-0 bg-transparent text-primary font-mono text-base sm:text-sm placeholder:font-sans placeholder:text-muted/70 focus:outline-none"
+            />
           </div>
-          <input
-            id="refund"
-            type="text"
-            value={state.refundAddress}
-            onChange={(e) => onSetRefundAddr(e.target.value)}
-            placeholder={`Your ${t.chainLabel} address`}
-            spellCheck={false}
-            autoComplete="off"
-            aria-invalid={!!refundError}
-            className="mt-2 w-full bg-transparent text-primary font-mono text-sm placeholder:font-sans placeholder:text-muted focus:outline-none"
-          />
-          <p className={`mt-1.5 text-xs ${refundError ? 'text-danger' : 'text-muted'}`}>
-            {refundError ?? 'Refunds land here if the swap can’t complete. Use an address you control.'}
+          <p id="refund-hint" className={`mt-1.5 pl-[4.25rem] text-xs ${refundError ? 'text-danger' : 'text-muted'}`}>
+            {refundError ?? 'Used only if the swap can’t complete.'}
           </p>
+        </section>
+      )}
+
+      {q && !zecError && (
+        <div className="border-t border-glass-6">
+          <PriceDetails
+            quote={preview.data}
+            token={t}
+            zecAddress={state.zecAddress}
+            slippageBps={state.slippageBps}
+            onSetSlippage={onSetSlippage}
+            loading={preview.loading}
+            flush
+          />
         </div>
       )}
 
-      <div className="pt-2">
-        <PriceDetails
-          quote={preview.data}
-          token={t}
-          zecAddress={state.zecAddress}
-          slippageBps={state.slippageBps}
-          onSetSlippage={onSetSlippage}
-          loading={preview.loading}
-        />
-      </div>
-
-      <div className="pt-2 space-y-2">
+      <div className="px-5 pb-5 pt-1 space-y-3">
         <button
           type="button"
           className="btn-primary"
@@ -222,15 +222,19 @@ export function EditView(props: EditViewProps) {
           {label}
         </button>
         {sendMode === 'choose' && (
-          <button type="button" onClick={onChooseManual} className="w-full py-1.5 text-sm text-muted hover:text-primary transition-colors">
-            or send manually from any wallet or exchange
+          <button type="button" onClick={onChooseManual} className="block mx-auto text-[0.8125rem] text-muted hover:text-primary transition-colors">
+            Send manually instead
           </button>
         )}
         {sendMode === 'wallet' && walletName && (
-          <p className="text-center text-xs text-muted">
-            Sending from {walletName} ·{' '}
-            <button type="button" onClick={onChooseManual} className="hover:text-primary underline underline-offset-2">send manually</button>
-          </p>
+          <button type="button" onClick={onChooseManual} className="block mx-auto text-[0.8125rem] text-muted hover:text-primary transition-colors">
+            Send manually instead
+          </button>
+        )}
+        {sendMode === 'manual' && (
+          <button type="button" onClick={onUseWallet} className="block mx-auto text-[0.8125rem] text-muted hover:text-primary transition-colors">
+            Use a wallet instead
+          </button>
         )}
       </div>
     </div>
