@@ -1,6 +1,6 @@
 import { Suspense } from 'react';
 import SwapClient from './_components/SwapClient';
-import { SwapHero, type NetworkStats } from './_components/SwapHero';
+import { SwapHeadline, SwapFacts, type NetworkStats } from './_components/SwapHero';
 import { sortTokens, apiTokensToSourceTokens, CIPHERSCAN_API } from './_components/types';
 import type { SourceToken, PopularPair } from './_components/types';
 import { getOneClickTokens } from '@/lib/oneclick-tokens';
@@ -49,13 +49,12 @@ export default async function SwapPage() {
   const [initialTokens, stats] = await Promise.all([getInitialTokens(), getNetworkStats()]);
 
   return (
-    <div className="max-w-6xl mx-auto px-4 sm:px-6 min-h-[calc(100dvh-var(--nav-height))] flex items-center py-6 sm:py-8">
-      <div className="w-full grid grid-cols-1 gap-6 lg:gap-12 lg:grid-cols-[minmax(0,1fr)_480px] items-start lg:items-center">
-        <SwapHero stats={stats} />
-        <Suspense fallback={<SwapSkeleton />}>
-          <SwapClient initialTokens={initialTokens.length > 0 ? initialTokens : undefined} />
-        </Suspense>
-      </div>
+    <div className="mx-auto w-full max-w-[480px] px-4 sm:px-0 pt-8 sm:pt-14 pb-16 flex flex-col gap-7 sm:gap-9">
+      <SwapHeadline />
+      <Suspense fallback={<SwapSkeleton />}>
+        <SwapClient initialTokens={initialTokens.length > 0 ? initialTokens : undefined} />
+      </Suspense>
+      <SwapFacts stats={stats} />
     </div>
   );
 }

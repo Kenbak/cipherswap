@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useWallet, chainToWalletType, type DetectedWallet } from '@/hooks/useWallet';
@@ -262,12 +261,6 @@ export default function SwapClient({ initialTokens }: { initialTokens?: SourceTo
           )}
         </AnimatePresence>
 
-      </div>
-
-      <div className="text-center">
-        <Link href="/how-it-works#privacy" className="text-xs text-muted hover:text-primary transition-colors">
-          What we know about you →
-        </Link>
       </div>
 
       <WalletModal
