@@ -441,33 +441,42 @@ export function useWallet(): UseWalletReturn {
     }
 
     if (state.walletType === 'solana') {
-      const { PublicKey, Transaction, Connection } = await import('@solana/web3.js');
+      const {
+        PublicKey, Connection, SystemProgram, TransactionMessage, VersionedTransaction,
+      } = await import('@solana/web3.js');
       const connection = new Connection(getSolanaRpcUrl());
-      const tx = new Transaction();
+      const from = new PublicKey(state.address!);
+      const instructions = [];
 
       if (contractAddress) {
         const { associatedTokenAddress, createAtaInstruction, createTokenTransferInstruction } = await import('@/lib/solana-token');
         const mint = new PublicKey(contractAddress);
-        const from = new PublicKey(state.address!);
         const toPubkey = new PublicKey(to);
         const tokenAmount = parseUnits(amount, decimals);
 
-        const sourceAta = associatedTokenAddress(mint, from);
-        const destAta = associatedTokenAddress(mint, toPubkey);
+        const sourceAta = await associatedTokenAddress(mint, from);
+        const destAta = await associatedTokenAddress(mint, toPubkey);
 
         if (!(await connection.getAccountInfo(destAta))) {
-          tx.add(createAtaInstruction(from, destAta, toPubkey, mint));
+          instructions.push(createAtaInstruction(from, destAta, toPubkey, mint));
         }
 
-        tx.add(createTokenTransferInstruction(sourceAta, destAta, from, tokenAmount));
+        instructions.push(createTokenTransferInstruction(sourceAta, destAta, from, tokenAmount));
       } else {
-        const { SystemProgram } = await import('@solana/web3.js');
         const lamports = parseUnits(amount, decimals);
-        tx.add(SystemProgram.transfer({ fromPubkey: new PublicKey(state.address!), toPubkey: new PublicKey(to), lamports }));
+        instructions.push(SystemProgram.transfer({ fromPubkey: from, toPubkey: new PublicKey(to), lamports }));
       }
 
-      tx.feePayer = new PublicKey(state.address!);
-      tx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
+      // web3.js v3 made legacy Transaction.serialize() async, which injected
+      // wallets don't await. A v0 VersionedTransaction serializes synchronously
+      // and is supported by Phantom and Solflare.
+      const { blockhash } = await connection.getLatestBlockhash();
+      const message = new TransactionMessage({
+        payerKey: from,
+        recentBlockhash: blockhash,
+        instructions,
+      }).compileToV0Message();
+      const tx = new VersionedTransaction(message);
       const signed = await rawProvider.signAndSendTransaction(tx);
       return signed.signature;
     }
